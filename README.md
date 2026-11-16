@@ -86,7 +86,6 @@ Cây thư mục dưới đây được đối chiếu với các tệp thực t�
 ```text
 quanlytrov6/
 ├── .htaccess                     Cấu hình Apache và giới hạn tải tệp
-├── README.md                     Hướng dẫn cài đặt, chức năng và phân quyền
 ├── index.php                     Trang công khai: danh sách phòng trống
 ├── phong_chi_tiet.php            Trang chi tiết phòng, slideshow và nút sửa cho quản lý
 ├── login.php                     Đăng nhập
