@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" role="img" aria-label="Phòng trọ có giường, tủ và bàn học">
+<defs>
+ <linearGradient id="wall" x2="0" y2="1"><stop stop-color="#f9fcff"/><stop offset="1" stop-color="#e7f0f8"/></linearGradient>
+ <linearGradient id="floor" x2="1" y2="1"><stop stop-color="#d8ae7d"/><stop offset="1" stop-color="#9b6848"/></linearGradient>
+ <linearGradient id="glass" x2="0" y2="1"><stop stop-color="#b6e5f7"/><stop offset="1" stop-color="#edfaff"/></linearGradient>
+</defs>
+<rect width="900" height="560" fill="#edf4fb"/>
+<path d="M80 86L520 28 820 155 820 395 80 455Z" fill="url(#wall)"/>
+<path d="M80 86L520 28 520 320 80 455Z" fill="#fbfdff"/>
+<path d="M520 28L820 155 820 395 520 320Z" fill="#e1ebf5"/>
+<path d="M80 455L520 320 820 395 455 550Z" fill="url(#floor)"/>
+<path d="M80 455L520 320M455 550L820 395M120 490L740 420M275 530L580 338" stroke="#8a5c3d" opacity=".3" stroke-width="5"/>
+<rect x="150" y="130" width="180" height="155" rx="4" fill="#fff" stroke="#bdcedd" stroke-width="12"/>
+<rect x="165" y="145" width="150" height="125" fill="url(#glass)"/>
+<path d="M240 145V270M165 205H315" stroke="#fff" stroke-width="9"/>
+<!-- wardrobe -->
+<path d="M620 175L740 210V374L620 340Z" fill="#bc8c5e" stroke="#8b6244" stroke-width="5"/>
+<path d="M632 185L681 199V352L632 338Z" fill="#d7b18a"/>
+<path d="M690 202L728 213V368L690 357Z" fill="#b78356"/>
+<path d="M674 255V278M710 268V290" stroke="#72533c" stroke-width="5" stroke-linecap="round"/>
+<!-- bed -->
+<path d="M185 362L415 302 620 354 395 430Z" fill="#4f6684"/>
+<path d="M185 362L395 430V492L185 425Z" fill="#6b829e"/>
+<path d="M395 430L620 354V417L395 492Z" fill="#425b7b"/>
+<path d="M201 352L410 293 600 343 390 407Z" fill="#f4f5f7" stroke="#b8c6d3" stroke-width="5"/>
+<path d="M211 354L300 329 377 351 288 377Z" fill="#ffffff"/>
+<path d="M288 377L377 351 430 367 341 394Z" fill="#dce8f3"/>
+<path d="M390 407L390 430M598 343V355" stroke="#31465e" stroke-width="6"/>
+<!-- desk -->
+<path d="M455 270L560 240 620 258 515 290Z" fill="#bd8c5e"/>
+<path d="M465 280V345M610 268V320" stroke="#8d6448" stroke-width="8"/>
+<path d="M470 248L535 230 570 240 505 258Z" fill="#e2c49e"/>
+<path d="M525 226Q542 200 558 220" fill="none" stroke="#344f6e" stroke-width="6"/>
+<path d="M550 218L575 228 568 242 543 233Z" fill="#f0c46c"/>
+<!-- plant -->
+<path d="M125 440L160 450 154 493 131 487Z" fill="#bc8052"/>
+<path d="M142 446Q110 400 124 382M145 445Q170 395 183 405M140 444Q139 388 154 372" fill="none" stroke="#39946c" stroke-width="10" stroke-linecap="round"/>
+<text x="450" y="48" text-anchor="middle" fill="#41627f" font-family="Arial,sans-serif" font-size="22" font-weight="700">PHÒNG ĐANG CHO THUÊ - HÌNH MINH HỌA</text>
+</svg>

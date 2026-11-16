@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" role="img" aria-label="Phòng trọ trống sáng, sạch sẽ">
+<defs>
+ <linearGradient id="wall" x2="0" y2="1"><stop stop-color="#f7fbff"/><stop offset="1" stop-color="#e8f1fb"/></linearGradient>
+ <linearGradient id="floor" x2="1" y2="1"><stop stop-color="#d5a574"/><stop offset="1" stop-color="#9c6947"/></linearGradient>
+ <linearGradient id="glass" x2="0" y2="1"><stop stop-color="#b8e5f4"/><stop offset="1" stop-color="#e7f8ff"/></linearGradient>
+ <filter id="shadow"><feGaussianBlur stdDeviation="12"/></filter>
+</defs>
+<rect width="900" height="560" fill="#edf4fb"/>
+<path d="M90 80L530 25 810 150 810 390 90 455Z" fill="url(#wall)"/>
+<path d="M90 80L530 25 530 320 90 455Z" fill="#f9fcff"/>
+<path d="M530 25L810 150 810 390 530 320Z" fill="#e3edf7"/>
+<path d="M90 455L530 320 810 390 450 545Z" fill="url(#floor)"/>
+<path d="M90 455L530 320M450 545L810 390M280 529L565 339M110 486L735 418" stroke="#8a5c3d" opacity=".28" stroke-width="5"/>
+<path d="M165 124L360 99 360 278 165 317Z" fill="#fff" stroke="#b9cddd" stroke-width="12"/>
+<path d="M180 137L345 116 345 267 180 297Z" fill="url(#glass)"/>
+<path d="M262 126V281M180 214L345 194" stroke="#fff" stroke-width="9"/>
+<path d="M560 120L735 195V300L560 255Z" fill="#fff" opacity=".72"/>
+<path d="M600 380L747 421 640 469 490 422Z" fill="#614b3e" opacity=".18" filter="url(#shadow)"/>
+<path d="M520 400L700 445 700 458 520 413Z" fill="#f5f7fb" stroke="#b8c7d6" stroke-width="5"/>
+<path d="M520 400L520 413 502 425 502 412Z" fill="#d5e0ea"/>
+<path d="M700 445V458L715 464V451Z" fill="#d5e0ea"/>
+<rect x="590" y="95" width="7" height="45" rx="3" fill="#c4d1dd"/>
+<path d="M565 94Q595 62 625 94L620 113H570Z" fill="#f4c66d"/>
+<path d="M585 115V126" stroke="#d2a54f" stroke-width="5"/>
+<path d="M385 405L440 390 440 475 385 490Z" fill="#b97d4d"/>
+<path d="M365 392L420 378 460 395 405 410Z" fill="#d6a16d"/>
+<path d="M405 410V452" stroke="#8f5d3d" stroke-width="6"/>
+<path d="M400 369Q410 325 424 354Q436 321 449 362" fill="none" stroke="#4a9b73" stroke-width="10" stroke-linecap="round"/>
+<path d="M403 385Q390 355 380 369M431 365Q449 334 462 352" fill="none" stroke="#62b889" stroke-width="9" stroke-linecap="round"/>
+<rect x="376" y="399" width="55" height="15" rx="5" fill="#ad7547"/>
+<text x="450" y="45" text-anchor="middle" fill="#41627f" font-family="Arial,sans-serif" font-size="22" font-weight="700">PHÒNG TRỐNG - HÌNH MINH HỌA</text>
+</svg>
