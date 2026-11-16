@@ -1,0 +1,23 @@
+# Giới hạn tải nhiều ảnh phòng: tối đa 50MB/tệp, tối đa 10 tệp (tổng request 520MB).
+# Nếu máy chủ không hỗ trợ php_value trong .htaccess, hãy đặt các giá trị tương ứng trong php.ini.
+<IfModule php_module>
+  php_value upload_max_filesize 50M
+  php_value post_max_size 520M
+  php_value max_file_uploads 10
+  php_value max_execution_time 300
+  php_value max_input_time 300
+</IfModule>
+<IfModule mod_php.c>
+  php_value upload_max_filesize 50M
+  php_value post_max_size 520M
+  php_value max_file_uploads 10
+  php_value max_execution_time 300
+  php_value max_input_time 300
+</IfModule>
+<IfModule mod_php8.c>
+  php_value upload_max_filesize 50M
+  php_value post_max_size 520M
+  php_value max_file_uploads 10
+  php_value max_execution_time 300
+  php_value max_input_time 300
+</IfModule>
