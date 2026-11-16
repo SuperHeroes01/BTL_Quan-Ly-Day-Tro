@@ -52,7 +52,7 @@ Bài tập lớn học phần **Phát triển ứng dụng trên nền Web** –
 
 Đổi mật khẩu sau khi dùng thử (menu **Tài khoản của tôi**).
 
-## 5. Các chức năng được bổ sung
+## 5. Các chức năng được bổ sung ( Phiên Bản V1+V2+V3 )
 ### Đăng ký và quên mật khẩu
 - Trang đăng nhập có liên kết **Đăng ký tài khoản** và **Quên mật khẩu**.
 - Khách có thể tự đăng ký tài khoản vai trò **Người thuê**. Tài khoản chưa gắn phòng sẽ hiển thị thông báo chờ Admin/Chủ trọ phân phòng.
