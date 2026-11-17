@@ -24,6 +24,15 @@ if (is_post()) {
 
 $rented = Database::get()->query("SELECT * FROM room WHERE status = 'Đã thuê' ORDER BY room_number");
 $room = $idRoom ? $roomM->find($idRoom) : null;
+$rentPrice = null;
+$rentPriceError = '';
+if ($room && $room['status'] === 'Đã thuê') {
+    try {
+        $rentPrice = $billM->contractRentPrice($idRoom, $month);
+    } catch (RuntimeException $e) {
+        $rentPriceError = $e->getMessage();
+    }
+}
 $services = $svcM->active();
 $pageTitle = 'Lập hóa đơn';
 $pageSub = 'Nhập chỉ số điện nước và chọn dịch vụ sử dụng trong tháng';
@@ -38,12 +47,12 @@ require __DIR__ . '/../includes/header.php';
     <button class="btn">Tiếp tục</button>
   </form></div></div>
 
-<?php if ($room && $room['status'] === 'Đã thuê'): ?>
-<form class="card" method="post" id="billForm" data-room-price="<?= h($room['price']) ?>">
+<?php if ($room && $room['status'] === 'Đã thuê' && $rentPrice !== null): ?>
+<form class="card" method="post" id="billForm" data-room-price="<?= h($rentPrice) ?>">
   <div class="card-h">Hóa đơn phòng <?= h($room['room_number']) ?> &middot; tháng <?= h(month_label($month)) ?></div>
   <div class="card-b">
     <?= csrf_field() ?><input type="hidden" name="id_room" value="<?= (int) $idRoom ?>"><input type="hidden" name="month" value="<?= h($month) ?>">
-    <div class="rowline"><span>Tiền phòng</span><b><?= h(money($room['price'])) ?></b></div>
+    <div class="rowline"><span>Tiền phòng theo hợp đồng</span><b><?= h(money($rentPrice)) ?></b></div>
     <h3 style="margin:14px 0 6px">Dịch vụ tính theo chỉ số</h3>
     <p class="meter-carry-note">Chỉ số cũ được tự động lấy từ chỉ số mới gần nhất đã lưu của phòng ở các hóa đơn trước. Ví dụ: tháng 10 ghi chỉ số mới 450 thì tháng 11 sẽ tự điền chỉ số cũ là 450. Chỉ lần ghi đầu tiên mới cần nhập chỉ số cũ ban đầu.</p>
     <div class="tw"><table class="t"><thead><tr><th>Dịch vụ</th><th>Đơn giá</th><th>Chỉ số cũ</th><th>Chỉ số mới</th><th>Thành tiền</th></tr></thead><tbody>
@@ -59,9 +68,10 @@ require __DIR__ . '/../includes/header.php';
       <label class="rowline fixed" data-price="<?= h($s['unit_price']) ?>" style="cursor:pointer"><span><input type="checkbox" name="use[<?= (int) $s['id_service'] ?>]" value="1" <?= $s['code'] !== 'maygiat' ? 'checked' : '' ?>> <?= h($s['service_name']) ?></span><b><?= h(money($s['unit_price'])) ?>/<?= h($s['unit']) ?></b></label>
     <?php endforeach; ?>
     <div class="field" style="margin-top:12px"><label>Ghi chú</label><input name="note" placeholder="Ví dụ: Giảm 50.000đ do mất nước 2 ngày"></div>
-    <p class="total">Tổng tạm tính: <span id="billTotal"><?= h(money($room['price'])) ?></span></p>
+    <p class="total">Tổng tạm tính: <span id="billTotal"><?= h(money($rentPrice)) ?></span></p>
     <button class="btn green">Lập hóa đơn</button> <a class="btn gray" href="<?= h(url('dich_vu/index.php')) ?>">Hủy</a>
   </div>
 </form>
+<?php elseif ($rentPriceError !== ''): ?><div class="alert warn"><?= h($rentPriceError) ?></div>
 <?php elseif ($idRoom): ?><div class="alert warn">Phòng chưa có người thuê nên không thể lập hóa đơn.</div><?php endif; ?>
 <?php require __DIR__ . '/../includes/footer.php'; ?>
