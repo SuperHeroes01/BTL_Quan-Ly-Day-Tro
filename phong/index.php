@@ -24,7 +24,7 @@ if (Auth::isManager() || Auth::is('nhanvien')) {
         : ['ds' => ['Danh sách phòng', 'phong/index.php']];
     echo tabs($tabs, 'ds');
     $kw = qs('q'); $status = qs('status');
-    $rooms = $roomM->searchRoom($kw, $status);
+    $rooms = $roomM->searchRoom($kw, $status, Auth::isManager());
     $st = $roomM->stats();
 ?>
 <div class="card">
@@ -43,7 +43,7 @@ if (Auth::isManager() || Auth::is('nhanvien')) {
         <div class="room <?= $cls ?>">
           <?php if (Auth::isManager()): ?><img class="room-thumb" src="<?= h(!empty($r['image_path']) ? url('phong/anh.php?id=' . (int) $r['id_room']) : url('assets/images/' . ($r['status'] === 'Đã thuê' ? 'room-rented.svg' : ($r['status'] === 'Bảo trì' ? 'room-maintenance.svg' : 'room-vacant.svg')))) ?>" alt="Hình ảnh phòng <?= h($r['room_number']) ?>" loading="lazy"><?php endif; ?>
           <h3><?= h($r['room_number']) ?></h3>
-          <p><?= h($r['tenant_names'] ?: 'Chưa có người thuê') ?></p>
+          <?php if (Auth::isManager()): ?><p><?= h($r['tenant_names'] ?: 'Chưa có người thuê') ?></p><?php endif; ?>
           <p><?= h(money($r['price'])) ?>/tháng<?= $r['area'] ? ' &middot; ' . h($r['area']) . ' m²' : '' ?></p>
           <p><?= (int) $r['occupants'] ?> người ở</p>
           <?php if (Auth::isManager()): ?>

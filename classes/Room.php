@@ -27,14 +27,19 @@ class Room extends BaseModel {
         return (int) $this->db->value("SELECT COUNT(*) FROM renter t WHERE t.id_room = ? AND " . Renter::ACTIVE, [(int) $idRoom]);
     }
 
-    public function searchRoom($kw = '', $status = '') {
+    public function searchRoom($kw = '', $status = '', $includeTenantNames = true) {
         $sql = "SELECT r.*,
-                  (SELECT COUNT(*) FROM renter t WHERE t.id_room = r.id_room AND " . Renter::ACTIVE . ") AS occupants,
-                  (SELECT GROUP_CONCAT(u.full_name SEPARATOR ', ') FROM renter t JOIN `user` u ON u.id_user = t.id_user
-                    WHERE t.id_room = r.id_room AND " . Renter::ACTIVE . ") AS tenant_names
-                FROM room r WHERE 1=1";
+                  (SELECT COUNT(*) FROM renter t WHERE t.id_room = r.id_room AND " . Renter::ACTIVE . ") AS occupants";
+        if ($includeTenantNames) {
+            $sql .= ", (SELECT GROUP_CONCAT(u.full_name SEPARATOR ', ') FROM renter t JOIN `user` u ON u.id_user = t.id_user
+                       WHERE t.id_room = r.id_room AND " . Renter::ACTIVE . ") AS tenant_names";
+        }
+        $sql .= " FROM room r WHERE 1=1";
         $p = [];
-        if ($kw !== '')     { $sql .= " AND r.room_number LIKE ?"; $p[] = "%$kw%"; }
+        if ($kw !== '') {
+            $sql .= " AND r.room_number LIKE ?";
+            $p[] = '%' . addcslashes($kw, '%_\\') . '%';
+        }
         if ($status !== '') { $sql .= " AND r.status = ?"; $p[] = $status; }
         return $this->db->query($sql . " ORDER BY r.room_number", $p);
     }

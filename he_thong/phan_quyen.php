@@ -5,18 +5,140 @@ Auth::guard(['admin']);
 $userM = new User();
 
 if (is_post()) {
+    // Kiểm tra CSRF trước khi xử lý dữ liệu POST
     csrf_check();
+
+    // Danh sách giá trị hợp lệ theo Auth::ROLES trong project
+    $allowedRoles = ['admin', 'chutro', 'nguoithue', 'nhanvien'];
+    $allowedStatuses = ['Hoạt động', 'Khóa'];
+    $activeStatus = 'Hoạt động';
+    $allowedActions = ['save', 'delete', 'reset'];
+
     $id = (int) post('id');
-    if (post('action') === 'save') {
-        if ($id === Auth::id() && (post('role') !== 'admin' || post('status') !== 'Hoạt động')) { flash('error', 'Không thể tự hạ quyền hoặc khóa tài khoản của chính mình'); }
-        else { $userM->setRoleStatus($id, post('role'), post('status')) ? flash('success', 'Đã cập nhật phân quyền') : flash('error', 'Dữ liệu không hợp lệ'); }
-    } elseif (post('action') === 'delete') {
-        $r = $userM->deleteTenantAccount($id);
-        $r === true ? flash('success', 'Đã xóa tài khoản người thuê') : flash('error', $r);
-    } elseif (post('action') === 'reset') {
-               $pw = $userM->resetPassword($id);
-        if ($pw === false) { flash('error', 'Không thể đặt lại mật khẩu tài khoản Admin hoặc Chủ trọ. Các tài khoản này chỉ tự đổi mật khẩu tại mục Tài khoản của tôi.'); }
-        else { flash('success', 'Mật khẩu mới của tài khoản: ' . $pw . ' (hãy chuyển cho người dùng và yêu cầu đổi lại)'); }
+    $action = (string) post('action');
+    $selfId = (int) Auth::id();
+
+    try {
+        // Kiểm tra ID tài khoản
+        if ($id <= 0) {
+            flash('error', 'ID tài khoản không hợp lệ.');
+
+        } elseif (!in_array($action, $allowedActions, true)) {
+            flash('error', 'Thao tác không hợp lệ.');
+
+        } elseif ($id === $selfId && $action !== 'save') {
+            // Không cho Admin tự xóa hoặc tự đặt lại mật khẩu
+            flash('error', 'Không thể thực hiện thao tác này trên chính tài khoản của bạn.');
+
+        } else {
+            switch ($action) {
+
+                // 1. Cập nhật vai trò và trạng thái
+                case 'save':
+                    $role = (string) post('role');
+                    $status = (string) post('status');
+
+                    // Kiểm tra dữ liệu đầu vào
+                    if (
+                        !in_array($role, $allowedRoles, true)
+                        || !in_array($status, $allowedStatuses, true)
+                    ) {
+                        flash('error', 'Dữ liệu vai trò hoặc trạng thái không hợp lệ.');
+                        break;
+                    }
+
+                    // Không cho Admin tự hạ quyền hoặc khóa chính mình
+                    if (
+                        $id === $selfId
+                        && ($role !== 'admin' || $status !== $activeStatus)
+                    ) {
+                        flash(
+                            'error',
+                            'Không thể tự hạ quyền hoặc khóa tài khoản của chính mình.'
+                        );
+                        break;
+                    }
+
+                    if ($userM->setRoleStatus($id, $role, $status)) {
+                        error_log(sprintf(
+                            '[Audit][Phan quyen] admin=%d cap nhat user=%d role=%s status=%s',
+                            $selfId,
+                            $id,
+                            $role,
+                            $status
+                        ));
+
+                        flash('success', 'Đã cập nhật phân quyền thành công.');
+                    } else {
+                        flash(
+                            'error',
+                            'Không thể cập nhật tài khoản. Vui lòng kiểm tra tài khoản và dữ liệu.'
+                        );
+                    }
+                    break;
+
+                // 2. Xóa tài khoản người thuê
+                case 'delete':
+                    $result = $userM->deleteTenantAccount($id);
+
+                    if ($result === true) {
+                        error_log(sprintf(
+                            '[Audit][Phan quyen] admin=%d xoa user=%d',
+                            $selfId,
+                            $id
+                        ));
+
+                        flash('success', 'Đã xóa tài khoản người thuê.');
+                    } else {
+                        flash(
+                            'error',
+                            is_string($result) ? $result : 'Không thể xóa tài khoản.'
+                        );
+                    }
+                    break;
+
+                // 3. Đặt lại mật khẩu
+                case 'reset':
+                    $password = $userM->resetPassword($id);
+
+                    if ($password === false) {
+                        flash(
+                            'error',
+                            'Không thể đặt lại mật khẩu tài khoản Admin hoặc Chủ trọ. '
+                            . 'Các tài khoản này chỉ tự đổi mật khẩu tại mục Tài khoản của tôi.'
+                        );
+                    } else {
+                        // Không ghi mật khẩu vào log
+                        error_log(sprintf(
+                            '[Audit][Phan quyen] admin=%d reset mat khau user=%d',
+                            $selfId,
+                            $id
+                        ));
+
+                        flash(
+                            'success',
+                            'Mật khẩu mới của tài khoản: ' . h($password)
+                            . ' (hãy chuyển cho người dùng và yêu cầu đổi lại).'
+                        );
+                    }
+                    break;
+            }
+        }
+
+    } catch (Throwable $e) {
+        // Ghi lỗi chi tiết vào log, không hiển thị lỗi hệ thống cho người dùng
+        error_log(sprintf(
+            '[Phan quyen] admin=%d target=%d action=%s: %s',
+            $selfId,
+            $id,
+            $action,
+            $e->getMessage()
+        ));
+
+        flash('error', 'Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại.');
+    }
+
+    // Post/Redirect/Get
     redirect('he_thong/phan_quyen.php');
 }
 $pageTitle = 'Quản Lý Hệ Thống';

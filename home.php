@@ -74,7 +74,15 @@ if (Auth::isManager()):
 
 <?php elseif (Auth::is('nhanvien')):
     $staff = (new Staff())->findByUser(Auth::id());
-    $reqs = (new RepairRequest())->search('open');
+
+    // Chỉ hiển thị yêu cầu được giao cho nhân viên đang đăng nhập
+    $reqs = $staff
+        ? (new RepairRequest())->search(
+            'open',
+            0,
+            (int) $staff['id_staff']
+        )
+        : [];
 ?>
   <div class="grid g3" style="margin-bottom:18px">
     <div class="card stat"><div class="ico i-red">!</div><div><b><?= count(array_filter($reqs, function ($r) { return $r['status'] === 'Chờ tiếp nhận'; })) ?></b><small>Yêu cầu chờ tiếp nhận</small></div></div>
