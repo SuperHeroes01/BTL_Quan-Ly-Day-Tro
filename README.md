@@ -5,10 +5,10 @@ Bài tập lớn học phần **Phát triển ứng dụng trên nền Web** –
 
 ## 1. Cài đặt lần đầu (XAMPP trên Windows)
 1. Cài XAMPP, mở **XAMPP Control Panel**, bấm **Start** cho **Apache** và **MySQL**.
-2. Giải nén project, chép thư mục `quanlytrov6` vào `C:\xampp\htdocs\`. Có thể đổi tên thư mục thành `quanlytro` nếu muốn dùng URL `http://localhost/quanlytro/`.
+2. Giải nén project, chép thư mục `quanlytrov6` vào `C:\xampp\htdocs\`. Có thể đổi tên thư mục thành `quanlytro` nếu muốn dùng URL `http://localhost/quanlytrov6/home.php`.
 3. Mở `http://localhost/phpmyadmin` → tab **Import** → chọn `database/quanlytro_full.sql` → **Import**. Script tạo database `quanlytro` nếu chưa có, tạo các bảng/cột còn thiếu và thêm dữ liệu mẫu khi database nghiệp vụ còn trống.
 4. Nếu MySQL có mật khẩu hoặc khác cổng, sửa `config/config.php` (`DB_HOST`, `DB_USER`, `DB_PASS`).
-5. Mở địa chỉ project trên trình duyệt, ví dụ `http://localhost/quanlytrov6/` hoặc `http://localhost/quanlytro/` tùy tên thư mục bạn đã đặt.
+5. Mở địa chỉ project trên trình duyệt, ví dụ `http://localhost/quanlytrov6/` hoặc `http://localhost/quanlytrov6/` tùy tên thư mục bạn đã đặt.
 
 > **Lưu ý về dữ liệu:** `database/quanlytro_full.sql` là file SQL tổng hợp hiện được đóng gói trong project. File không có lệnh `DROP DATABASE`, `DROP TABLE` hoặc `TRUNCATE`; các bảng được tạo bằng `CREATE TABLE IF NOT EXISTS`, các cột cũ được bổ sung có điều kiện. Dữ liệu mẫu chỉ được thêm khi các bảng nghiệp vụ đều trống. Tuy vậy, hãy **Export sao lưu database trước khi Import**, đặc biệt với dữ liệu đang sử dụng. File SQL này không chứa dữ liệu thực tế phát sinh riêng trên máy bạn và cũng không chứa ảnh/tệp trong `uploads/`.
 >
@@ -230,4 +230,7 @@ Mật khẩu được băm bằng `password_hash`; truy vấn dùng prepared sta
 ## Lịch sử cập nhật: V6.5 – Mở trang công khai trong cùng tab
 - Liên kết **Xem trang phòng công khai** trong menu quản trị không còn mở bằng tab mới.
 - Khi nhấn liên kết, trang công khai được mở ngay trong tab hiện tại; có thể dùng nút Back của trình duyệt để trở lại màn hình quản trị trước đó.
-- Không thay đổi dữ liệu hoặc cấu trúc database.
+- Không thay đổi dữ liệu hoặc cấu trúc database,
+
+
+
