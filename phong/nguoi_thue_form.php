@@ -13,7 +13,7 @@ $preUserId = (!$id && !is_post()) ? (int) qs('user', '0') : 0;
 $pre = $preUserId ? Database::get()->one("SELECT u.id_user, u.full_name, u.recovery_phone, u.recovery_identity_card FROM `user` u LEFT JOIN renter t ON t.id_user = u.id_user
     WHERE u.id_user = ? AND u.role = 'nguoithue' AND u.status = 'Hoạt động' AND t.id_renter IS NULL", [$preUserId]) : null;
 $d = $cur ?: ['full_name' => '', 'username' => '', 'phone' => '', 'identity_card' => '', 'birth_date' => '', 'registered_address' => '', 'identity_issue_date' => '', 'identity_issue_place' => '', 'payment_method' => '', 'hometown' => '', 'id_room' => (int) qs('room', '0'),
-              'start_date' => date('Y-m-d'), 'end_date' => '', 'deposit' => '0'];
+              'start_date' => date('Y-m-d'), 'end_date' => '', 'deposit' => '0', 'rent_price' => ''];
 if ($pre) { $d['full_name'] = $pre['full_name']; $d['phone'] = (string) $pre['recovery_phone']; $d['identity_card'] = (string) $pre['recovery_identity_card']; }
 if (is_post()) {
     csrf_check();
@@ -22,7 +22,8 @@ if (is_post()) {
           'registered_address' => post('registered_address'), 'identity_issue_date' => post('identity_issue_date'),
           'identity_issue_place' => post('identity_issue_place'), 'payment_method' => post('payment_method'),
           'hometown' => post('hometown'), 'id_room' => (int) post('id_room'),
-          'start_date' => post('start_date'), 'end_date' => post('end_date'), 'deposit' => post('deposit', '0')];
+          'start_date' => post('start_date'), 'end_date' => post('end_date'), 'deposit' => post('deposit', '0'),
+          'rent_price' => trim((string) post('rent_price', ''))];
     if ($d['full_name'] === '') { $errors[] = 'Vui lòng nhập họ tên'; }
     if (!preg_match('/^[0-9]{9,11}$/', $d['phone'])) { $errors[] = 'Số điện thoại phải gồm 9-11 chữ số'; }
     if (!preg_match('/^[0-9]{9,12}$/', $d['identity_card'])) { $errors[] = 'CCCD/CMND phải gồm 9-12 chữ số'; }
@@ -31,9 +32,14 @@ if (is_post()) {
     if ($d['identity_issue_date'] !== '' && !valid_date($d['identity_issue_date'])) { $errors[] = 'Ngày cấp CCCD/CMND không hợp lệ'; }
     if ($d['end_date'] !== '' && (!valid_date($d['end_date']) || $d['end_date'] <= $d['start_date'])) { $errors[] = 'Ngày trả phòng phải sau ngày bắt đầu'; }
     if (!is_numeric($d['deposit']) || $d['deposit'] < 0) { $errors[] = 'Tiền cọc không hợp lệ'; }
+    if (!preg_match('/^[0-9]+$/D', $d['rent_price']) || (float) $d['rent_price'] <= 0 || (float) $d['rent_price'] > 999999999999) { $errors[] = 'Giá thuê hợp đồng phải là số nguyên dương hợp lệ'; }
+    if ($id && (float) $d['rent_price'] !== (float) $cur['rent_price'] && post('confirm_rent_change') !== '1') {
+        $errors[] = 'Bạn cần xác nhận hai bên đã đồng ý thay đổi giá thuê hợp đồng';
+    }
+
     $room = $roomM->find($d['id_room']);
     if (!$room) { $errors[] = 'Vui lòng chọn phòng'; }
-       // Chỉ chặn khi gán người thuê MỚI vào phòng đang bảo trì; người đang ở sẵn trong phòng đó vẫn được sửa thông tin.
+    // Chỉ chặn khi gán người thuê MỚI vào phòng đang bảo trì; người đang ở sẵn trong phòng đó vẫn được sửa thông tin.
     elseif ($room['status'] === 'Bảo trì' && (!$id || (int) $cur['id_room'] !== (int) $d['id_room'])) { $errors[] = 'Phòng đang bảo trì, không thể cho thuê'; }
 
     $mode = post('account_mode', 'new');
@@ -53,13 +59,24 @@ if (is_post()) {
                  'registered_address' => $d['registered_address'],
                  'identity_issue_date' => $d['identity_issue_date'] === '' ? null : $d['identity_issue_date'],
                  'identity_issue_place' => $d['identity_issue_place'], 'payment_method' => $d['payment_method'],
-                 'start_date' => $d['start_date'], 'end_date' => $d['end_date'] === '' ? null : $d['end_date'], 'deposit' => (float) $d['deposit']];
+                 'start_date' => $d['start_date'], 'end_date' => $d['end_date'] === '' ? null : $d['end_date'], 'deposit' => (float) $d['deposit'],
+                 'rent_price' => (float) $d['rent_price']];
         try {
             if ($id) {
                 $oldRoom = (int) $cur['id_room'];
-                $renterM->update($id, $info);
-                $userM->update((int) $cur['id_user'], ['full_name' => $d['full_name'], 'recovery_phone' => $d['phone'], 'recovery_identity_card' => $d['identity_card']]);
-                $roomM->refreshStatus($oldRoom); $roomM->refreshStatus($d['id_room']);
+                // Cập nhật hồ sơ, tài khoản khôi phục và trạng thái phòng như một giao dịch.
+                $db = Database::get();
+                $db->begin();
+                try {
+                    $renterM->update($id, $info);
+                    $userM->update((int) $cur['id_user'], ['full_name' => $d['full_name'], 'recovery_phone' => $d['phone'], 'recovery_identity_card' => $d['identity_card']]);
+                    $roomM->refreshStatus($oldRoom);
+                    $roomM->refreshStatus($d['id_room']);
+                    $db->commit();
+                } catch (Throwable $e) {
+                    $db->rollback();
+                    throw $e;
+                }
                 flash('success', 'Đã cập nhật thông tin người thuê');
             } elseif ($mode === 'existing') {
                 $renterM->registerExisting($existingUserId, $info, $d['full_name']);
@@ -93,8 +110,10 @@ require __DIR__ . '/../includes/header.php';
       <div class="field"><label>Nơi cấp CCCD/CMND</label><input name="identity_issue_place" value="<?= h($d['identity_issue_place'] ?? '') ?>"></div>
       <div class="field"><label>Hình thức thanh toán tiền thuê</label><input name="payment_method" value="<?= h($d['payment_method'] ?? '') ?>" placeholder="Ví dụ: Tiền mặt / Chuyển khoản"></div>
       <div class="field"><label>Quê quán</label><input name="hometown" value="<?= h($d['hometown']) ?>"></div>
-      <div class="field"><label>Phòng *</label><select name="id_room" required data-label="Phòng"><option value="">-- Chọn phòng --</option>
-        <?php foreach ($rooms as $r): ?><option value="<?= (int) $r['id_room'] ?>" <?= (int) $d['id_room'] === (int) $r['id_room'] ? 'selected' : '' ?>><?= h($r['room_number']) ?> (<?= h($r['status']) ?>)</option><?php endforeach; ?></select></div>
+      <div class="field"><label>Phòng *</label><select name="id_room" id="renterRoomSelect" required data-label="Phòng"><option value="">-- Chọn phòng --</option>
+        <?php foreach ($rooms as $r): ?><option value="<?= (int) $r['id_room'] ?>" data-price="<?= h($r['price']) ?>" <?= (int) $d['id_room'] === (int) $r['id_room'] ? 'selected' : '' ?>><?= h($r['room_number']) ?> (<?= h($r['status']) ?>)</option><?php endforeach; ?></select></div>
+      <div class="field"><label>Giá thuê theo hợp đồng (đ/tháng) *</label><input type="number" name="rent_price" id="contractRentPrice" min="1" max="999999999999" step="1" value="<?= h($d['rent_price'] ?? '') ?>" required data-label="Giá thuê hợp đồng"><small>Giá đã thỏa thuận, không tự thay đổi khi sửa giá niêm yết phòng.</small></div>
+      <?php if ($id): ?><div class="field"><label><input type="checkbox" name="confirm_rent_change" value="1"> Xác nhận hai bên đã đồng ý thay đổi giá thuê (chỉ cần tích khi sửa giá)</label><small>Chỉ sửa giá sau khi có thỏa thuận; nên lưu phụ lục/hồ sơ xác nhận riêng. Hóa đơn cũ không bị tính lại.</small></div><?php endif; ?>
       <div class="field"><label>Tiền cọc (đ)</label><input type="number" name="deposit" min="0" step="1000" value="<?= h($d['deposit']) ?>" data-label="Tiền cọc"></div>
       <div class="field"><label>Ngày bắt đầu thuê *</label><input type="date" name="start_date" value="<?= h($d['start_date']) ?>" required data-label="Ngày bắt đầu"></div>
       <div class="field"><label>Ngày trả phòng (nếu đã xác định)</label><input type="date" name="end_date" value="<?= h($d['end_date']) ?>"></div>
@@ -121,6 +140,21 @@ require __DIR__ . '/../includes/header.php';
   var pick=document.getElementById('registeredUser'), username=document.getElementById('newUsername'), password=document.getElementById('newPassword');
   function sync(){ var useExisting=mode.value==='existing'; existing.hidden=!useExisting; fresh.hidden=useExisting; pick.required=useExisting; pick.disabled=!useExisting; username.required=!useExisting; password.required=!useExisting; username.disabled=useExisting; password.disabled=useExisting; }
   mode.addEventListener('change',sync); sync();
+})();
+</script>
+<?php endif; ?>
+<?php if (!$id): ?>
+<script>
+(function () {
+    var room = document.getElementById('renterRoomSelect');
+    var rent = document.getElementById('contractRentPrice');
+    if (!room || !rent) return;
+    function suggestPrice() {
+        var option = room.options[room.selectedIndex];
+        if (option && option.dataset.price) rent.value = option.dataset.price;
+    }
+    room.addEventListener('change', suggestPrice);
+    if (!rent.value && room.value) suggestPrice();
 })();
 </script>
 <?php endif; ?>
