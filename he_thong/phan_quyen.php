@@ -10,6 +10,9 @@ if (is_post()) {
     if (post('action') === 'save') {
         if ($id === Auth::id() && (post('role') !== 'admin' || post('status') !== 'Hoạt động')) { flash('error', 'Không thể tự hạ quyền hoặc khóa tài khoản của chính mình'); }
         else { $userM->setRoleStatus($id, post('role'), post('status')) ? flash('success', 'Đã cập nhật phân quyền') : flash('error', 'Dữ liệu không hợp lệ'); }
+    } elseif (post('action') === 'delete') {
+        $r = $userM->deleteTenantAccount($id);
+        $r === true ? flash('success', 'Đã xóa tài khoản người thuê') : flash('error', $r);
     } elseif (post('action') === 'reset') {
                $pw = $userM->resetPassword($id);
         if ($pw === false) { flash('error', 'Không thể đặt lại mật khẩu tài khoản Admin hoặc Chủ trọ. Các tài khoản này chỉ tự đổi mật khẩu tại mục Tài khoản của tôi.'); }
@@ -44,5 +47,9 @@ $users = $userM->search(qs('q'), qs('role'));
         <?php else: ?>
         <form class="inline" method="post" data-confirm="Đặt lại mật khẩu cho <?= h($u['username']) ?>?"><?= csrf_field() ?><input type="hidden" name="action" value="reset"><input type="hidden" name="id" value="<?= (int) $u['id_user'] ?>"><button class="btn sm amber">Đặt lại MK</button></form>
         <?php endif; ?>
+        <?php if ($u['role'] === 'nguoithue'): ?>
+        <form class="inline" method="post" data-confirm="Xóa vĩnh viễn tài khoản <?= h($u['username']) ?>? Chỉ xóa được khi người này không còn thuê phòng."><?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int) $u['id_user'] ?>"><button class="btn sm red">Xóa</button></form>
+        <?php endif; ?>
+      </div></td></tr>
   <?php endforeach; ?></tbody></table></div></div></div>
 <?php require __DIR__ . '/../includes/footer.php'; ?>
