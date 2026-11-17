@@ -12,10 +12,19 @@ class Room extends BaseModel {
     public function editRoom($id, array $d)    { return $this->update($id, $d); }
     public function updateStatus($id, $status) { return $this->update($id, ['status' => $status]); }
 
-    // Tự cập nhật trạng thái theo số người đang thuê
-    public function refreshStatus($idRoom) {
+       // Tự cập nhật trạng thái theo số người đang thuê.
+    // Phòng đang "Bảo trì" được giữ nguyên (không bị ghi đè khi trả phòng/gia hạn/sửa người thuê);
+    // chỉ khi $force = true (kết thúc bảo trì) mới tính lại theo người đang ở.
+    public function refreshStatus($idRoom, $force = false) {
+        $room = $this->find((int) $idRoom);
+        if (!$room) { return; }
+        if ($room['status'] === 'Bảo trì' && !$force) { return; }
         $n = (int) $this->db->value("SELECT COUNT(*) FROM renter t WHERE t.id_room = ? AND " . Renter::ACTIVE, [(int) $idRoom]);
         $this->updateStatus($idRoom, $n > 0 ? 'Đã thuê' : 'Trống');
+    }
+
+    public function activeRenterCount($idRoom) {
+        return (int) $this->db->value("SELECT COUNT(*) FROM renter t WHERE t.id_room = ? AND " . Renter::ACTIVE, [(int) $idRoom]);
     }
 
     public function searchRoom($kw = '', $status = '') {
