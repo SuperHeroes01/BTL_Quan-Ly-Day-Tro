@@ -17,6 +17,37 @@ class Bill extends BaseModel {
         return $v === null ? null : (int) $v;
     }
 
+    // Giá hợp đồng áp dụng cho tháng lập hóa đơn (không dùng giá niêm yết).
+    public function contractRentPrice($idRoom, $month) {
+        if (!valid_month($month)) {
+            throw new RuntimeException('Tháng lập hóa đơn không hợp lệ');
+        }
+        $firstDay = $month . '-01';
+        $lastDay = date('Y-m-t', strtotime($firstDay));
+        $contracts = $this->db->query(
+            "SELECT id_renter, rent_price FROM renter
+             WHERE id_room = ? AND start_date <= ?
+               AND (end_date IS NULL OR end_date > ?)",
+            [(int) $idRoom, $lastDay, $firstDay]
+        );
+        if (!$contracts) {
+            throw new RuntimeException('Không có hợp đồng thuê có hiệu lực trong tháng đã chọn');
+        }
+        $price = null;
+        foreach ($contracts as $contract) {
+            $value = $contract['rent_price'];
+            if ($value === null || !is_numeric($value) || (float) $value <= 0) {
+                throw new RuntimeException('Hợp đồng chưa có giá thuê hợp lệ. Hãy cập nhật hồ sơ thuê trước khi lập hóa đơn');
+            }
+            $current = (float) $value;
+            if ($price !== null && $price !== $current) {
+                throw new RuntimeException('Có nhiều hợp đồng với giá thuê khác nhau trong tháng. Cần xác nhận mức giá trước khi lập hóa đơn');
+            }
+            $price = $current;
+        }
+        return $price;
+    }
+
     public function calculateTotal(array $items) {
         $t = 0.0;
         foreach ($items as $it) { $t += (float) $it['amount']; }
@@ -34,10 +65,11 @@ class Bill extends BaseModel {
             throw new RuntimeException('Phòng ' . $room['room_number'] . ' đã có hóa đơn tháng ' . month_label($month));
         }
 
+        $rentPrice = $this->contractRentPrice($idRoom, $month);
         $items = [[
             'id_service' => null, 'item_name' => 'Tiền phòng', 'old_index' => null, 'new_index' => null,
-            'quantity' => 1, 'unit_price' => (float) $room['price'],
-            'amount' => ItemizedBill::calculateAmount(1, $room['price']),
+            'quantity' => 1, 'unit_price' => $rentPrice,
+            'amount' => ItemizedBill::calculateAmount(1, $rentPrice),
         ]];
 
         foreach ((new Service())->active() as $s) {
