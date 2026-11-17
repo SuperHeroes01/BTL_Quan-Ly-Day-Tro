@@ -110,8 +110,17 @@ class User extends BaseModel {
         return true;
     }
 
-        /    // Đặt lại mật khẩu ngẫu nhiên, trả về mật khẩu mới để quản trị viên chuyển cho người dùng
+           // Vai trò hệ thống cố định: không được đặt lại mật khẩu trực tiếp qua web, chỉ tự đổi mật khẩu
+    // (cần mật khẩu hiện tại) tại trang "Tài khoản của tôi".
+    public function canResetPassword($id) {
+        $u = $this->find((int) $id);
+        return $u && !in_array($u['role'], ['admin', 'chutro'], true);
+    }
+
+    // Đặt lại mật khẩu ngẫu nhiên, trả về mật khẩu mới để quản trị viên chuyển cho người dùng.
+    // Trả về false nếu tài khoản không tồn tại hoặc là Admin/Chủ trọ.
     public function resetPassword($id) {
+        if (!$this->canResetPassword($id)) { return false; }
         $pw = substr(str_shuffle('abcdefghjkmnpqrstuvwxyz23456789'), 0, 8);
         $this->update($id, ['password' => $pw]);
         return $pw;
