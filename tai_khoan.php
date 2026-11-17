@@ -11,8 +11,13 @@ if (is_post()) {
     csrf_check();
     $act = post('action');
     if ($act === 'profile') {
-        $r = $userM->updateProfile(Auth::id(), post('full_name'));
-        if ($r === true && $renter) { $r = $renterM->updateContact((int) $renter['id_renter'], post('phone'), post('hometown')); }
+        try {
+            $r = $renter
+                ? $renterM->updateProfileAndContact((int) $renter['id_renter'], post('full_name'), post('phone'), post('hometown'))
+                : $userM->updateProfile(Auth::id(), post('full_name'));
+        } catch (Throwable $e) {
+            $r = 'Không thể lưu thông tin cá nhân. Vui lòng thử lại.';
+        }
         if ($r === true) { $_SESSION['user']['full_name'] = post('full_name'); flash('success', 'Đã cập nhật thông tin cá nhân'); }
         else { flash('error', $r); }
     } elseif ($act === 'password') {
