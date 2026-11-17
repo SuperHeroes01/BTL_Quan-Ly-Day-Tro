@@ -110,7 +110,7 @@ class User extends BaseModel {
         return true;
     }
 
-    // Đặt lại mật khẩu ngẫu nhiên, trả về mật khẩu mới để quản trị viên chuyển cho người dùng
+        /    // Đặt lại mật khẩu ngẫu nhiên, trả về mật khẩu mới để quản trị viên chuyển cho người dùng
     public function resetPassword($id) {
         $pw = substr(str_shuffle('abcdefghjkmnpqrstuvwxyz23456789'), 0, 8);
         $this->update($id, ['password' => $pw]);
