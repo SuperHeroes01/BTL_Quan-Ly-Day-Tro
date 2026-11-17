@@ -32,7 +32,7 @@ if (is_post()) {
             $room = $roomM->find($roomId);
             if (!$room) { throw new RuntimeException('Không tìm thấy phòng cần cập nhật'); }
             $roomM->update($roomId, ['price' => (int) $price]);
-            flash('success', 'Đã cập nhật giá thuê phòng ' . $room['room_number'] . '. Hợp đồng cũ và hóa đơn đã lập được giữ nguyên.');
+            flash('success', 'Đã cập nhật giá thuê phòng ' . $room['room_number'] . '. Giá hợp đồng và hóa đơn đã lập không tự thay đổi.');
         } elseif ($act === 'add') {
             $code = strtolower(post('code'));
             if (!preg_match('/^[a-z0-9_]{2,20}$/', $code)) { throw new RuntimeException('Mã dịch vụ gồm 2-20 ký tự chữ thường, số, gạch dưới'); }
@@ -92,7 +92,7 @@ $rooms = $roomM->all('room_number');
   </form>
 </div></div>
 <div class="card"><div class="card-h">Cập nhật giá thuê phòng trọ</div><div class="card-b">
-  <p class="t-muted" style="margin-bottom:12px">Admin có thể tự nhập bất kỳ giá thuê nguyên đồng nào cho từng phòng (ví dụ 3000000, 3800000 hoặc 4000000), không bị ép theo bậc 1.000 đồng. Giá mới áp dụng cho hóa đơn lập sau thời điểm cập nhật; hợp đồng và hóa đơn cũ không thay đổi.</p>
+  <p class="t-muted" style="margin-bottom:12px">Admin có thể tự nhập bất kỳ giá thuê nguyên đồng nào cho từng phòng (ví dụ 3000000, 3800000 hoặc 4000000), không bị ép theo bậc 1.000 đồng. Đây chỉ là giá niêm yết. Hóa đơn mới dùng giá hợp đồng có hiệu lực; hợp đồng hiện tại và hóa đơn cũ không tự thay đổi.</p>
   <div class="tw"><table class="t"><thead><tr><th>Mã phòng</th><th>Diện tích</th><th>Trạng thái</th><th>Giá thuê hiện tại (đ/tháng)</th><th>Cập nhật</th></tr></thead><tbody>
   <?php foreach ($rooms as $room): ?><tr><td><b><?= h($room['room_number']) ?></b></td><td><?= $room['area'] ? h($room['area']) . ' m²' : '—' ?></td><td><?= status_badge($room['status']) ?></td><td>
     <form class="inline" method="post" style="display:flex;gap:6px;align-items:center;min-width:280px"><?= csrf_field() ?><input type="hidden" name="action" value="room_price"><input type="hidden" name="room_id" value="<?= (int) $room['id_room'] ?>">
