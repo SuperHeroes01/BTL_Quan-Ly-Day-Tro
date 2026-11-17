@@ -8,20 +8,39 @@ class Auth {
         'nhanvien'  => 'Nhân viên kỹ thuật',
     ];
 
-    // Mỗi request chỉ cần xác minh session một lần, tránh truy vấn lặp trong cùng trang.
+    // Xác minh tối đa một lần trong mỗi request để tránh truy vấn lặp.
     private static $sessionValidated = false;
     private static $sessionValid = false;
 
-    public static function user()  { return self::check() ? $_SESSION['user'] : null; }
+    public static function user() {
+        return self::check() ? $_SESSION['user'] : null;
+    }
+
+    /**
+     * Không tin dữ liệu đăng nhập chỉ nằm trong session.
+     * Mỗi request sẽ đối chiếu id, trạng thái và vai trò với database.
+     * Nếu tài khoản bị xóa, bị khóa, đổi vai trò hoặc không thể xác minh,
+     * phiên đăng nhập bị thu hồi (fail closed).
+     */
     public static function check() {
-        if (empty($_SESSION['user']['id'])) { return false; }
-        if (self::$sessionValidated) { return self::$sessionValid; }
+        if (empty($_SESSION['user']['id']) || (int) $_SESSION['user']['id'] <= 0) {
+            if (isset($_SESSION['user'])) {
+                self::invalidateAuthentication();
+            }
+            return false;
+        }
+
+        if (self::$sessionValidated) {
+            return self::$sessionValid;
+        }
         self::$sessionValidated = true;
 
         try {
-            // Không tin session cũ: đối chiếu lại tài khoản với database ở mỗi request.
             $dbUser = Database::get()->one(
-                "SELECT id_user, username, full_name, role, status FROM `user` WHERE id_user = ?",
+                "SELECT id_user, username, full_name, role, status
+                 FROM `user`
+                 WHERE id_user = ?
+                 LIMIT 1",
                 [(int) $_SESSION['user']['id']]
             );
         } catch (Throwable $e) {
@@ -30,63 +49,115 @@ class Auth {
             return false;
         }
 
-        // Tài khoản đã bị xóa, bị khóa hoặc bị đổi vai trò: gỡ quyền đăng nhập ngay.
-        if (!$dbUser || $dbUser['status'] !== 'Hoạt động'
-            || $dbUser['role'] !== ($_SESSION['user']['role'] ?? null)) {
+        $sessionRole = $_SESSION['user']['role'] ?? null;
+        if (!$dbUser
+            || trim((string) ($dbUser['status'] ?? '')) !== 'Hoạt động'
+            || ($dbUser['role'] ?? null) !== $sessionRole) {
+            // Không tự cập nhật vai trò mới vào session: buộc đăng nhập lại
+            // sau khi Admin thay đổi vai trò để tránh giữ quyền cũ/quyền mới.
             self::invalidateAuthentication();
             return false;
         }
 
-        // Đồng bộ tên hiển thị nếu Admin vừa cập nhật hồ sơ.
-        $_SESSION['user']['username'] = $dbUser['username'];
-        $_SESSION['user']['full_name'] = $dbUser['full_name'];
+        // Đồng bộ tên hiển thị mới nhất, nhưng giữ nguyên id và role đã xác minh.
+        $_SESSION['user'] = [
+            'id'        => (int) $dbUser['id_user'],
+            'username'  => $dbUser['username'],
+            'full_name' => $dbUser['full_name'],
+            'role'      => $dbUser['role'],
+        ];
+
         self::$sessionValid = true;
         return true;
     }
 
-    public static function id()    { return self::check() ? (int) $_SESSION['user']['id'] : 0; }
-    public static function role()  { return self::check() ? $_SESSION['user']['role'] : null; }
-    public static function is(...$roles) { return in_array(self::role(), $roles, true); }
-    public static function isManager() { return self::is('admin', 'chutro'); }
+    public static function id() {
+        return self::check() ? (int) $_SESSION['user']['id'] : 0;
+    }
 
-    // Hủy trạng thái đăng nhập nhưng giữ CSRF/flash trong session hiện tại,
-    // để biểu mẫu đăng nhập vẫn hoạt động ngay sau khi phát hiện session cũ.
+    public static function role() {
+        return self::check() ? ($_SESSION['user']['role'] ?? null) : null;
+    }
+
+    public static function is(...$roles) {
+        return in_array(self::role(), $roles, true);
+    }
+
+    public static function isManager() {
+        return self::is('admin', 'chutro');
+    }
+
+    // Hủy riêng thông tin xác thực, giữ CSRF/flash để form đăng nhập tiếp tục hoạt động.
     private static function invalidateAuthentication() {
         unset($_SESSION['user']);
-        if (session_status() === PHP_SESSION_ACTIVE) { session_regenerate_id(true); }
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_regenerate_id(true);
+        }
         self::$sessionValidated = true;
         self::$sessionValid = false;
     }
 
+    // ---- Đăng nhập ----
     public static function login(array $u) {
         session_regenerate_id(true);
+
         $_SESSION['user'] = [
-            'id' => (int) $u['id_user'], 'username' => $u['username'],
-            'full_name' => $u['full_name'], 'role' => $u['role'],
+            'id'        => (int) $u['id_user'],
+            'username'  => $u['username'],
+            'full_name' => $u['full_name'],
+            'role'      => $u['role'],
         ];
+
+        // Tài khoản vừa được User::login() xác minh bằng mật khẩu và trạng thái.
         self::$sessionValidated = true;
         self::$sessionValid = true;
+
+        // Giữ tương thích với phiên bản có hàm ghi nhật ký đăng nhập.
+        if (function_exists('write_log')) {
+            write_log('Đăng nhập vào hệ thống', 'AUTH');
+        }
     }
 
+    // ---- Đăng xuất thủ công ----
     public static function logout() {
         $_SESSION = [];
+
         if (ini_get('session.use_cookies')) {
             $p = session_get_cookie_params();
-            setcookie(session_name(), '', time() - 42000, $p['path'], $p['domain'], $p['secure'], $p['httponly']);
+            setcookie(
+                session_name(),
+                '',
+                time() - 42000,
+                $p['path'],
+                $p['domain'],
+                $p['secure'],
+                $p['httponly']
+            );
         }
-        if (session_status() === PHP_SESSION_ACTIVE) { session_destroy(); }
+
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_destroy();
+        }
+
         self::$sessionValidated = true;
         self::$sessionValid = false;
     }
 
-    // Bảo vệ trang: chưa đăng nhập/tài khoản đã bị thu hồi -> về trang đăng nhập; sai quyền -> 403.
-    public static function guard(array $roles = null) {
-        if (!self::check()) { redirect('login.php'); }
+    // ---- Kiểm tra đăng nhập và phân quyền ----
+    public static function guard(?array $roles = null) {
+        if (!self::check()) {
+            redirect('login.php');
+        }
+
         if ($roles !== null && !self::is(...$roles)) {
             http_response_code(403);
-            die('<!DOCTYPE html><meta charset="utf-8"><body style="font-family:sans-serif;padding:40px">'
+            die(
+                '<!DOCTYPE html><html lang="vi"><meta charset="UTF-8">'
+                . '<body style="font-family:sans-serif;padding:40px">'
                 . '<h2>403 - Bạn không có quyền truy cập chức năng này</h2>'
-                . '<p><a href="' . h(url('home.php')) . '">&larr; Về trang chủ</a></p></body>');
+                . '<p><a href="' . h(url('home.php')) . '">&larr; Về trang chủ</a></p>'
+                . '</body></html>'
+            );
         }
     }
 }
