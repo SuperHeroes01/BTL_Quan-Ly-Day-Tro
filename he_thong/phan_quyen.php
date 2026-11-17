@@ -11,9 +11,9 @@ if (is_post()) {
         if ($id === Auth::id() && (post('role') !== 'admin' || post('status') !== 'Hoạt động')) { flash('error', 'Không thể tự hạ quyền hoặc khóa tài khoản của chính mình'); }
         else { $userM->setRoleStatus($id, post('role'), post('status')) ? flash('success', 'Đã cập nhật phân quyền') : flash('error', 'Dữ liệu không hợp lệ'); }
     } elseif (post('action') === 'reset') {
-        $pw = $userM->resetPassword($id);
-        flash('success', 'Mật khẩu mới của tài khoản: ' . $pw . ' (hãy chuyển cho người dùng và yêu cầu đổi lại)');
-    }
+               $pw = $userM->resetPassword($id);
+        if ($pw === false) { flash('error', 'Không thể đặt lại mật khẩu tài khoản Admin hoặc Chủ trọ. Các tài khoản này chỉ tự đổi mật khẩu tại mục Tài khoản của tôi.'); }
+        else { flash('success', 'Mật khẩu mới của tài khoản: ' . $pw . ' (hãy chuyển cho người dùng và yêu cầu đổi lại)'); }
     redirect('he_thong/phan_quyen.php');
 }
 $pageTitle = 'Quản Lý Hệ Thống';
