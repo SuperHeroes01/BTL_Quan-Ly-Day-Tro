@@ -75,7 +75,7 @@ require __DIR__ . '/../includes/header.php';
   <p class="contract-agreement"><b>Sau khi bàn bạc trên tinh thần dân chủ, hai bên cùng có lợi, cùng thống nhất như sau:</b></p>
   <section class="contract-legal-section contract-rental-terms">
     <p>Bên A đồng ý cho bên B thuê 01 phòng ở tại địa chỉ: <?= $display($address, 28) ?>, phòng <?= h($contract['room_number']) ?>.</p>
-    <p>Diện tích: <?= $display($contract['area'] ? $contract['area'] . ' m²' : '', 8) ?>. Giá thuê: <?= h(money($contract['rent_price'] ?: $contract['price'])) ?> đ/tháng. Hình thức thanh toán: <?= $display($contract['payment_method'] ?? '', 16) ?></p>
+    <p>Diện tích: <?= $display($contract['area'] ? $contract['area'] . ' m²' : '', 8) ?>. Giá thuê: <?= h(((float) $contract['rent_price'] > 0 ? money($contract['rent_price']) : 'CHƯA XÁC NHẬN')) ?> đ/tháng. Hình thức thanh toán: <?= $display($contract['payment_method'] ?? '', 16) ?></p>
     <p>Tiền điện <?= $displayRate($electricity, 'kWh') ?> tính theo chỉ số công tơ, thanh toán vào cuối các tháng.</p>
     <p>Tiền nước: <?= $display('', 12) ?> đ/người thanh toán vào đầu các tháng.</p>
     <p>Tiền đặt cọc: <?= h(money($contract['deposit'])) ?>.</p>
