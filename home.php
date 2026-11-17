@@ -32,8 +32,14 @@ if (Auth::isManager()):
         $ev[] = [$x['t'], 'Báo lỗi ' . $x['device_name'] . ($x['room_number'] ? ' ' . $x['room_number'] : ''), 'Yêu cầu sửa chữa'];
     }
     usort($ev, function ($a, $b) { return strcmp($b[0], $a[0]); });
-    $ev = array_slice($ev, 0, 6);
+        $ev = array_slice($ev, 0, 6);
+    $pendingTenants = Auth::is('admin') ? (new User())->pendingTenants() : [];
 ?>
+  <?php if ($pendingTenants): ?>
+    <div class="alert warn"><b>Có <?= count($pendingTenants) ?> tài khoản người thuê mới đăng ký đang chờ gắn phòng:</b>
+      <?= h(implode(', ', array_map(function ($p) { return $p['full_name'] . ' (' . $p['username'] . ')'; }, array_slice($pendingTenants, 0, 5)))) ?><?= count($pendingTenants) > 5 ? '…' : '' ?>
+      <a href="<?= h(url('phong/nguoi_thue.php')) ?>">Gắn phòng ngay</a></div>
+  <?php endif; ?>
   <div class="grid g4" style="margin-bottom:18px">
     <div class="card stat"><div class="ico i-blue">▮</div><div><b><?= $st['total'] ?></b><small>Tổng số phòng</small></div></div>
     <div class="card stat"><div class="ico i-green">☺</div><div><b><?= $st['rented'] ?></b><small>Phòng đang cho thuê</small><em class="t-green"><?= $pct ?>% lấp đầy</em></div></div>
@@ -103,7 +109,7 @@ if (Auth::isManager()):
     }
 ?>
   <?php if (!$info): ?>
-    <div class="alert warn">Tài khoản của bạn chưa được gắn với phòng nào. Vui lòng liên hệ chủ trọ.</div>
+    <div class="alert warn">Tài khoản của bạn chưa được gắn với phòng nào. Quản trị viên đã nhận được thông báo và sẽ gắn phòng cho bạn; vui lòng chờ hoặc liên hệ trực tiếp.</div>
   <?php else: ?>
     <?php foreach ($unpaid as $b): ?>
       <div class="alert <?= $b['due_date'] < date('Y-m-d') ? 'error' : 'warn' ?>">
