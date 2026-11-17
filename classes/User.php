@@ -125,7 +125,47 @@ class User extends BaseModel {
         $this->update($id, ['password' => $pw]);
         return $pw;
     }
+    // ---- Tài khoản người thuê mới đăng ký, chưa được gắn phòng (thông báo cho Admin) ----
+    public function pendingTenants() {
+        return $this->db->query("SELECT u.id_user, u.username, u.full_name, u.recovery_phone, u.recovery_identity_card, u.created_at
+            FROM `user` u LEFT JOIN renter t ON t.id_user = u.id_user
+            WHERE u.role = 'nguoithue' AND u.status = 'Hoạt động' AND t.id_renter IS NULL
+            ORDER BY u.created_at DESC, u.id_user DESC");
+    }
 
+    public function pendingTenantCount() {
+        return (int) $this->db->value("SELECT COUNT(*) FROM `user` u LEFT JOIN renter t ON t.id_user = u.id_user
+            WHERE u.role = 'nguoithue' AND u.status = 'Hoạt động' AND t.id_renter IS NULL");
+    }
+
+    // Admin xóa tài khoản người thuê. Chỉ xóa được khi KHÔNG còn thuê phòng (chưa gắn phòng hoặc hợp đồng đã kết thúc).
+    // Trả về true hoặc chuỗi báo lỗi.
+    public function deleteTenantAccount($id) {
+        $u = $this->find((int) $id);
+        if (!$u) { return 'Không tìm thấy tài khoản'; }
+        if ($u['role'] !== 'nguoithue') { return 'Chỉ được xóa tài khoản Người thuê'; }
+        $renter = $this->db->one("SELECT t.* FROM renter t WHERE t.id_user = ?", [(int) $id]);
+        if ($renter && ($renter['end_date'] === null || $renter['end_date'] > date('Y-m-d'))) {
+            return 'Người thuê vẫn đang thuê phòng. Hãy làm thủ tục trả phòng trước khi xóa tài khoản';
+        }
+        $open = (int) $this->db->value("SELECT COUNT(*) FROM repair_request WHERE id_user = ? AND status IN ('Chờ tiếp nhận','Đang sửa')", [(int) $id]);
+        if ($open > 0) { return 'Tài khoản còn yêu cầu sửa chữa chưa xử lý xong, hãy xử lý xong rồi mới xóa'; }
+        $this->db->begin();
+        try {
+            $this->db->exec("DELETE FROM repair_request WHERE id_user = ?", [(int) $id]);
+            if ($renter) { $this->db->exec("DELETE FROM renter WHERE id_renter = ?", [(int) $renter['id_renter']]); }
+            $this->delete((int) $id);
+            $this->db->commit();
+        } catch (Throwable $e) {
+            $this->db->rollback();
+            throw $e;
+        }
+        if ($renter && !empty($renter['id_card_image'])) {
+            $f = UPLOAD_DIR . basename($renter['id_card_image']);
+            if (is_file($f)) { @unlink($f); }
+        }
+        return true;
+    }
     public function search($kw = '', $role = '') {
         $sql = "SELECT * FROM `user` WHERE 1=1";
         $p = [];
