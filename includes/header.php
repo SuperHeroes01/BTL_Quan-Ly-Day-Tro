@@ -10,7 +10,7 @@ $brand = Setting::get('ten_day_tro', APP_NAME);
 $badgeService = 0; $badgeDevice = 0; $badgePending = 0;
 if (Auth::isManager()) {
     $badgeService = (new Bill())->unpaidCount();
-        $badgeDevice = (new RepairRequest())->countOpen();
+    $badgeDevice = (new RepairRequest())->countOpen();
     if (Auth::is('admin')) { $badgePending = (new User())->pendingTenantCount(); }
 } elseif (Auth::is('nhanvien')) {
     $badgeDevice = (new RepairRequest())->countOpen();
@@ -22,7 +22,7 @@ if (Auth::isManager()) {
 $menu = [['home', 'Trang chủ', 'home.php', '▦', 0]];
 if (Auth::isManager()) {
     $menu[] = ['dich_vu', 'Quản lý Dịch Vụ', 'dich_vu/index.php', '☰', $badgeService];
-        $menu[] = ['phong', 'Quản lý Phòng Trọ', Auth::is('admin') && $badgePending > 0 ? 'phong/nguoi_thue.php' : 'phong/index.php', '⌂', $badgePending];
+    $menu[] = ['phong', 'Quản lý Phòng Trọ', Auth::is('admin') && $badgePending > 0 ? 'phong/nguoi_thue.php' : 'phong/index.php', '⌂', $badgePending];
     $menu[] = ['thiet_bi', 'Quản lý Thiết Bị', 'thiet_bi/index.php', '⚒', $badgeDevice];
 } elseif (Auth::is('nhanvien')) {
     $menu[] = ['thiet_bi', 'Quản lý Thiết Bị', 'thiet_bi/index.php', '⚒', $badgeDevice];
@@ -32,8 +32,12 @@ if (Auth::isManager()) {
     $menu[] = ['phong', 'Phòng của tôi', 'phong/index.php', '⌂', 0];
     $menu[] = ['thiet_bi', 'Thiết bị & Báo lỗi', 'thiet_bi/index.php', '⚒', 0];
 }
+
 $menu2 = [];
-if (Auth::is('admin')) { $menu2[] = ['he_thong', 'Quản lý Hệ Thống', 'he_thong/phan_quyen.php', '⚙', 0]; }
+if (Auth::is('admin')) { 
+    $menu2[] = ['he_thong', 'Quản lý Hệ Thống', 'he_thong/phan_quyen.php', '⚙', 0]; 
+    $menu2[] = ['nhat_ky', 'Nhật ký hoạt động', 'he_thong/nhat_ky.php', '📜', 0]; // Đã tích hợp mục Nhật ký hoạt động
+}
 $menu2[] = ['tai_khoan', 'Tài khoản của tôi', 'tai_khoan.php', '☺', 0];
 ?>
 <!DOCTYPE html>
