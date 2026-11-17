@@ -10,11 +10,18 @@ class User extends BaseModel {
         if (in_array(($d['role'] ?? 'nguoithue'), ['admin', 'chutro'], true)) {
             throw new RuntimeException('Không thể tạo vai trò Admin hoặc Chủ trọ từ giao diện hệ thống.');
         }
+        if (!empty($d['username']) && $this->usernameExists((string) $d['username'])) {
+            throw new RuntimeException('Tên đăng nhập đã tồn tại hoặc đã được thu hồi, không thể sử dụng lại.');
+        }
         $d['password'] = password_hash($d['password'], PASSWORD_DEFAULT);
         return $this->insertRow($d);
     }
 
     public function update($id, array $d) {
+        // Không cho đổi tên đăng nhập sang tên đã bị thu hồi.
+        if (isset($d['username']) && $this->usernameExists((string) $d['username'], (int) $id)) {
+            throw new RuntimeException('Tên đăng nhập đã tồn tại hoặc đã được thu hồi, không thể sử dụng lại.');
+        }
         // Bảo vệ vai trò hệ thống ở tầng model, kể cả khi có POST tự tạo ngoài giao diện.
         if (array_key_exists('role', $d)) {
             $current = $this->find((int) $id);
@@ -92,8 +99,18 @@ class User extends BaseModel {
         return true;
     }
 
+    // Tên đăng nhập trong danh sách thu hồi được giữ chỗ vĩnh viễn sau khi xóa tài khoản,
+    // tránh người khác đăng ký lại cùng username và giả danh tài khoản cũ.
     public function usernameExists($username, $exceptId = 0) {
-        return (bool) $this->db->value("SELECT COUNT(*) FROM `user` WHERE username = ? AND id_user <> ?", [$username, (int) $exceptId]);
+        $inUse = (bool) $this->db->value(
+            "SELECT COUNT(*) FROM `user` WHERE username = ? AND id_user <> ?",
+            [(string) $username, (int) $exceptId]
+        );
+        if ($inUse) { return true; }
+        return (bool) $this->db->value(
+            "SELECT COUNT(*) FROM deleted_username WHERE username = ?",
+            [(string) $username]
+        );
     }
 
     public function setRoleStatus($id, $role, $status) {
@@ -117,11 +134,16 @@ class User extends BaseModel {
         return $u && !in_array($u['role'], ['admin', 'chutro'], true);
     }
 
-    // Đặt lại mật khẩu ngẫu nhiên, trả về mật khẩu mới để quản trị viên chuyển cho người dùng.
+    // Đặt lại mật khẩu bằng bộ sinh số ngẫu nhiên mật mã an toàn.
     // Trả về false nếu tài khoản không tồn tại hoặc là Admin/Chủ trọ.
     public function resetPassword($id) {
         if (!$this->canResetPassword($id)) { return false; }
-        $pw = substr(str_shuffle('abcdefghjkmnpqrstuvwxyz23456789'), 0, 8);
+        $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+        $pw = '';
+        $max = strlen($alphabet) - 1;
+        for ($i = 0; $i < 12; $i++) {
+            $pw .= $alphabet[random_int(0, $max)];
+        }
         $this->update($id, ['password' => $pw]);
         return $pw;
     }
@@ -138,28 +160,76 @@ class User extends BaseModel {
             WHERE u.role = 'nguoithue' AND u.status = 'Hoạt động' AND t.id_renter IS NULL");
     }
 
-    // Admin xóa tài khoản người thuê. Chỉ xóa được khi KHÔNG còn thuê phòng (chưa gắn phòng hoặc hợp đồng đã kết thúc).
-    // Trả về true hoặc chuỗi báo lỗi.
+    // Admin xóa tài khoản người thuê khỏi bảng user và hồ sơ renter.
+    // Username được lưu vào deleted_username để chặn đăng nhập cũ và ngăn đăng ký lại tên đã thu hồi.
+    // Chỉ xóa sau khi người thuê đã trả phòng và không còn yêu cầu sửa chữa đang mở.
     public function deleteTenantAccount($id) {
-        $u = $this->find((int) $id);
+        $id = (int) $id;
+        if ($id <= 0) { return 'ID tài khoản không hợp lệ'; }
+        if ($id === (int) Auth::id()) { return 'Không thể tự xóa tài khoản đang đăng nhập'; }
+
+        $u = $this->find($id);
         if (!$u) { return 'Không tìm thấy tài khoản'; }
         if ($u['role'] !== 'nguoithue') { return 'Chỉ được xóa tài khoản Người thuê'; }
-        $renter = $this->db->one("SELECT t.* FROM renter t WHERE t.id_user = ?", [(int) $id]);
+
+        // Bảo đảm database đã chạy migration lưu tên đăng nhập bị thu hồi.
+        $hasRegistry = (int) $this->db->value(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'deleted_username'"
+        );
+        if (!$hasRegistry) {
+            return 'Cơ sở dữ liệu chưa có bảng deleted_username. Hãy chạy database/migration_v67_deleted_username.sql trước khi xóa tài khoản.';
+        }
+
+        $renter = $this->db->one("SELECT t.* FROM renter t WHERE t.id_user = ?", [$id]);
         if ($renter && ($renter['end_date'] === null || $renter['end_date'] > date('Y-m-d'))) {
             return 'Người thuê vẫn đang thuê phòng. Hãy làm thủ tục trả phòng trước khi xóa tài khoản';
         }
-        $open = (int) $this->db->value("SELECT COUNT(*) FROM repair_request WHERE id_user = ? AND status IN ('Chờ tiếp nhận','Đang sửa')", [(int) $id]);
-        if ($open > 0) { return 'Tài khoản còn yêu cầu sửa chữa chưa xử lý xong, hãy xử lý xong rồi mới xóa'; }
+
+        // Không xóa nhầm một user vẫn đang được dùng làm tài khoản nhân viên kỹ thuật.
+        $staffLinks = (int) $this->db->value("SELECT COUNT(*) FROM staff WHERE id_user = ?", [$id]);
+        if ($staffLinks > 0) {
+            return 'Tài khoản đang được liên kết với hồ sơ nhân viên kỹ thuật. Hãy gỡ liên kết trước khi xóa.';
+        }
+
+        $open = (int) $this->db->value(
+            "SELECT COUNT(*) FROM repair_request WHERE id_user = ? AND status IN ('Chờ tiếp nhận','Đang sửa')",
+            [$id]
+        );
+        if ($open > 0) {
+            return 'Tài khoản còn yêu cầu sửa chữa chưa xử lý xong, hãy xử lý xong rồi mới xóa';
+        }
+
         $this->db->begin();
         try {
-            $this->db->exec("DELETE FROM repair_request WHERE id_user = ?", [(int) $id]);
-            if ($renter) { $this->db->exec("DELETE FROM renter WHERE id_renter = ?", [(int) $renter['id_renter']]); }
-            $this->delete((int) $id);
+            // Ghi tên đăng nhập vào sổ thu hồi trước khi xóa bản ghi tài khoản.
+            $this->db->exec(
+                "INSERT INTO deleted_username (username, original_user_id, deleted_by, deleted_at)
+                 VALUES (?, ?, ?, NOW())
+                 ON DUPLICATE KEY UPDATE original_user_id = VALUES(original_user_id), deleted_by = VALUES(deleted_by), deleted_at = VALUES(deleted_at)",
+                [$u['username'], $id, (int) Auth::id() ?: null]
+            );
+
+            // Xóa các yêu cầu đã đóng để không vi phạm khóa ngoại id_user.
+            $this->db->exec("DELETE FROM repair_request WHERE id_user = ?", [$id]);
+            if ($renter) {
+                $this->db->exec("DELETE FROM renter WHERE id_renter = ?", [(int) $renter['id_renter']]);
+            }
+
+            $deleted = $this->db->exec("DELETE FROM `user` WHERE id_user = ? AND role = 'nguoithue'", [$id]);
+            if ($deleted !== 1) {
+                throw new RuntimeException('Không xóa được bản ghi tài khoản. Giao dịch đã được hoàn tác.');
+            }
+            $stillExists = (int) $this->db->value("SELECT COUNT(*) FROM `user` WHERE id_user = ?", [$id]);
+            if ($stillExists !== 0) {
+                throw new RuntimeException('Tài khoản vẫn còn trong cơ sở dữ liệu. Giao dịch đã được hoàn tác.');
+            }
             $this->db->commit();
         } catch (Throwable $e) {
             $this->db->rollback();
             throw $e;
         }
+
+        // Chỉ xóa ảnh CCCD sau khi transaction database đã commit thành công.
         if ($renter && !empty($renter['id_card_image'])) {
             $f = UPLOAD_DIR . basename($renter['id_card_image']);
             if (is_file($f)) { @unlink($f); }
