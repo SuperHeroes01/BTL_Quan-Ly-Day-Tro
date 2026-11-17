@@ -8,8 +8,13 @@ $cur = $id ? $renterM->findFull($id) : null;
 if ($id && !$cur) { flash('error', 'Không tìm thấy người thuê'); redirect('phong/nguoi_thue.php'); }
 
 $errors = [];
+// Mở từ thông báo "tài khoản chờ gắn phòng": tự chọn sẵn tài khoản và điền thông tin đã đăng ký.
+$preUserId = (!$id && !is_post()) ? (int) qs('user', '0') : 0;
+$pre = $preUserId ? Database::get()->one("SELECT u.id_user, u.full_name, u.recovery_phone, u.recovery_identity_card FROM `user` u LEFT JOIN renter t ON t.id_user = u.id_user
+    WHERE u.id_user = ? AND u.role = 'nguoithue' AND u.status = 'Hoạt động' AND t.id_renter IS NULL", [$preUserId]) : null;
 $d = $cur ?: ['full_name' => '', 'username' => '', 'phone' => '', 'identity_card' => '', 'birth_date' => '', 'registered_address' => '', 'identity_issue_date' => '', 'identity_issue_place' => '', 'payment_method' => '', 'hometown' => '', 'id_room' => (int) qs('room', '0'),
               'start_date' => date('Y-m-d'), 'end_date' => '', 'deposit' => '0'];
+if ($pre) { $d['full_name'] = $pre['full_name']; $d['phone'] = (string) $pre['recovery_phone']; $d['identity_card'] = (string) $pre['recovery_identity_card']; }
 if (is_post()) {
     csrf_check();
     $d = ['full_name' => post('full_name'), 'username' => post('username'), 'phone' => post('phone'),
@@ -28,7 +33,8 @@ if (is_post()) {
     if (!is_numeric($d['deposit']) || $d['deposit'] < 0) { $errors[] = 'Tiền cọc không hợp lệ'; }
     $room = $roomM->find($d['id_room']);
     if (!$room) { $errors[] = 'Vui lòng chọn phòng'; }
-    elseif ($room['status'] === 'Bảo trì') { $errors[] = 'Phòng đang bảo trì, không thể cho thuê'; }
+       // Chỉ chặn khi gán người thuê MỚI vào phòng đang bảo trì; người đang ở sẵn trong phòng đó vẫn được sửa thông tin.
+    elseif ($room['status'] === 'Bảo trì' && (!$id || (int) $cur['id_room'] !== (int) $d['id_room'])) { $errors[] = 'Phòng đang bảo trì, không thể cho thuê'; }
 
     $mode = post('account_mode', 'new');
     $existingUserId = (int) post('registered_user_id', '0');
@@ -95,10 +101,10 @@ require __DIR__ . '/../includes/header.php';
     </div>
     <?php if (!$id): ?>
       <hr class="soft-rule">
-      <div class="field"><label>Cách tạo tài khoản</label><select name="account_mode" id="accountMode"><option value="new">Tạo tài khoản mới tại đây</option><?php if ($registeredUsers): ?><option value="existing">Gắn tài khoản người thuê đã tự đăng ký</option><?php endif; ?></select></div>
+      <div class="field"><label>Cách tạo tài khoản</label><select name="account_mode" id="accountMode"><option value="new">Tạo tài khoản mới tại đây</option><?php if ($registeredUsers): ?><option value="existing" <?= $pre ? 'selected' : '' ?>>Gắn tài khoản người thuê đã tự đăng ký</option><?php endif; ?></select></div>
       <?php if ($registeredUsers): ?>
       <div id="existingUserBox" class="account-choice" hidden><div class="field"><label>Chọn tài khoản đã đăng ký</label><select name="registered_user_id" id="registeredUser"><option value="">-- Chọn tài khoản --</option>
-        <?php foreach ($registeredUsers as $ru): ?><option value="<?= (int) $ru['id_user'] ?>"><?= h($ru['full_name']) ?> · <?= h($ru['username']) ?> · <?= h($ru['recovery_phone']) ?></option><?php endforeach; ?></select></div><small>Tài khoản này sẽ được gắn vào phòng đang chọn, không tạo tài khoản trùng.</small></div>
+        <?php foreach ($registeredUsers as $ru): ?><option value="<?= (int) $ru['id_user'] ?>" <?= $pre && (int) $pre['id_user'] === (int) $ru['id_user'] ? 'selected' : '' ?>><?= h($ru['full_name']) ?> · <?= h($ru['username']) ?> · <?= h($ru['recovery_phone']) ?></option><?php endforeach; ?></select></div><small>Tài khoản này sẽ được gắn vào phòng đang chọn, không tạo tài khoản trùng.</small></div>
       <?php endif; ?>
       <div id="newUserBox" class="account-choice"><div class="form-row">
         <div class="field"><label>Tên đăng nhập *</label><input name="username" value="<?= h($d['username']) ?>" id="newUsername" required data-label="Tên đăng nhập"></div>
