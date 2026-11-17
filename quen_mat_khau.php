@@ -37,7 +37,8 @@ $brand = Setting::get('ten_day_tro', APP_NAME);
   <section class="auth-form-wrap">
     <form class="auth-form" method="post" data-validate>
       <?= csrf_field() ?>
-      <div class="auth-heading"><span class="auth-tag">KHÔI PHỤC MẬT KHẨU</span><h2>Quên mật khẩu?</h2><p>Nhập đúng thông tin đã dùng khi đăng ký.</p><p class="auth-note">Bản demo áp dụng cho tài khoản Người thuê. Tài khoản Admin, Chủ trọ và Nhân viên kỹ thuật cần liên hệ Admin để được hỗ trợ.</p></div>
+      <div class="auth-heading"><span class="auth-tag">KHÔI PHỤC MẬT KHẨU</span><h2>Quên mật khẩu?</h2><p>Nhập đúng thông tin đã dùng khi đăng ký.</p>
+         <p class="auth-note">Chức năng này chỉ áp dụng cho tài khoản Người thuê. Tài khoản Admin và Chủ trọ không thể đặt lại mật khẩu trên web, chỉ đổi được mật khẩu sau khi đăng nhập (mục Tài khoản của tôi). Nhân viên kỹ thuật liên hệ Admin để được hỗ trợ.</p>
       <?php if ($success): ?>
         <div class="alert success">Đã đổi mật khẩu thành công. Bạn có thể đăng nhập bằng mật khẩu mới.</div>
         <a class="btn auth-submit" href="<?= h(url('login.php')) ?>">Quay lại đăng nhập</a>
