@@ -16,7 +16,7 @@ if (is_post()) {
             $result = (new User())->registerTenantAccount($d['username'], $password, $d['full_name'], $d['phone'], $d['identity_card']);
             if (is_string($result)) { $error = $result; }
             else {
-                flash('success', 'Đăng ký tài khoản thành công. Vui lòng đăng nhập và liên hệ Chủ trọ để được gán phòng.');
+                flash('success', 'Đăng ký tài khoản thành công. Quản trị viên đã được thông báo và sẽ gắn phòng cho tài khoản của bạn. Bạn có thể đăng nhập, phòng sẽ hiển thị sau khi được gắn.');
                 redirect('login.php');
             }
         } catch (mysqli_sql_exception $e) { $error = mysql_error_text($e); }
@@ -52,7 +52,7 @@ $brand = Setting::get('ten_day_tro', APP_NAME);
       <div class="field"><label>Nhập lại mật khẩu *</label><input type="password" name="password_again" required minlength="6" autocomplete="new-password" placeholder="Nhập lại mật khẩu"></div>
       <button class="btn auth-submit">Tạo tài khoản</button>
       <div class="auth-links"><span>Đã có tài khoản?</span><a href="<?= h(url('login.php')) ?>">Đăng nhập</a></div>
-      <p class="auth-note">Sau khi đăng ký, Chủ trọ/Admin cần gán tài khoản của bạn với phòng thuê để hiển thị thông tin phòng và hợp đồng.</p>
+      <p class="auth-note">Sau khi đăng ký, hệ thống sẽ thông báo cho Admin để gắn tài khoản của bạn với phòng thuê để hiển thị thông tin phòng và hợp đồng.</p>
     </form>
   </section>
 </div>
