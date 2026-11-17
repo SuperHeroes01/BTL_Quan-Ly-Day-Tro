@@ -33,8 +33,8 @@ if (is_post()) {
         if (!preg_match('/^[0-9]+$/D', trim((string) $d['price'])) || (float) $d['price'] < 1 || (float) $d['price'] > 999999999999) { $errors[] = 'Giá thuê phải là số nguyên dương, tối đa 999.999.999.999 đồng'; }
         if ($d['area'] !== '' && (!is_numeric($d['area']) || $d['area'] <= 0)) { $errors[] = 'Diện tích phải là số dương'; }
         if (!in_array($d['status'], ['Trống', 'Đã thuê', 'Bảo trì'], true)) { $errors[] = 'Trạng thái không hợp lệ'; }
-        if ($id && $d['status'] === 'Trống' && $room['status'] === 'Đã thuê'
-            && Database::get()->value("SELECT COUNT(*) FROM renter t WHERE t.id_room = ? AND " . Renter::ACTIVE, [$id])) {
+                // Phòng đang có người ở (kể cả khi đang bảo trì) không thể chuyển sang Trống; hết bảo trì thì trở lại "Đã thuê".
+        if ($id && $d['status'] === 'Trống' && $roomM->activeRenterCount($id) > 0) {
             $errors[] = 'Phòng đang có người thuê, hãy làm thủ tục trả phòng trước khi chuyển sang Trống';
         }
 
@@ -98,6 +98,8 @@ if (is_post()) {
             try {
                 $db->begin();
                 $savedId = (int) $roomM->save($save, $id ?: null);
+                // Không phải đang bảo trì -> trạng thái theo người đang ở, giữ nguyên người thuê sau khi bảo trì xong.
+                if ($d['status'] !== 'Bảo trì') { $roomM->refreshStatus($savedId, true); }
                 if ($deleteIds) {
                     $marks = implode(',', array_fill(0, count($deleteIds), '?'));
                     $params = array_merge([$savedId], $deleteIds);
@@ -164,7 +166,7 @@ $managerPreview = $existingImages
           <div class="field"><label>Mã phòng *</label><input name="room_number" value="<?= h($d['room_number']) ?>" required data-label="Mã phòng" placeholder="P101"></div>
           <div class="field"><label>Giá thuê (đ/tháng) *</label><input type="number" name="price" min="1" max="999999999999" step="1" value="<?= h($d['price']) ?>" required data-label="Giá thuê"><small>Nhập số tiền nguyên đồng tùy ý, ví dụ: 3000000, 3800000 hoặc 4000000. Không bắt buộc theo bậc 1.000 đồng.</small></div>
           <div class="field"><label>Diện tích (m²)</label><input type="number" name="area" min="1" step="0.5" value="<?= h($d['area']) ?>"></div>
-          <div class="field"><label>Trạng thái</label><select name="status"><?php foreach (['Trống', 'Đã thuê', 'Bảo trì'] as $s): ?><option <?= $d['status'] === $s ? 'selected' : '' ?>><?= h($s) ?></option><?php endforeach; ?></select><small>Trạng thái được đồng bộ khi thêm hoặc trả phòng cho người thuê.</small></div>
+          <div class="field"><label>Trạng thái</label><select name="status"><?php $occupied = $id && $roomM->activeRenterCount($id) > 0; foreach (($occupied ? ['Đã thuê', 'Bảo trì'] : ['Trống', 'Đã thuê', 'Bảo trì']) as $s): ?><option <?= $d['status'] === $s ? 'selected' : '' ?>><?= h($s) ?></option><?php endforeach; ?></select><small>Trạng thái được đồng bộ khi thêm hoặc trả phòng cho người thuê.</small></div>
           <div class="field full"><label>Mô tả phòng</label><textarea name="description" rows="3" placeholder="Ví dụ: Phòng thoáng, có cửa sổ, ban công..."><?= h($d['description']) ?></textarea></div>
           <div class="field full"><label>Đồ dùng / tiện nghi trong phòng</label><textarea name="amenities" rows="4" placeholder="Mỗi dòng một tiện nghi, ví dụ:\nGiường và nệm\nTủ quần áo\nBàn học\nĐiều hòa\nWifi miễn phí"><?= h($d['amenities'] ?? '') ?></textarea><small>Thông tin này sẽ hiển thị ở trang chi tiết phòng công khai.</small></div>
           <div class="field full"><label>Thêm nhiều ảnh thực tế cùng lúc</label><input type="file" name="room_images[]" accept="image/jpeg,image/png,image/webp" multiple data-room-files><small><?php if ($id): ?>Ảnh sẽ được tải và lưu ngay vào thư viện (tối đa 10 ảnh/lần, 50MB/ảnh). Không cần bấm “Lưu thông tin phòng”; xóa ảnh cũng có hiệu lực ngay.<?php else: ?>Chọn tối đa 10 ảnh/lần, 50MB/ảnh. Với phòng mới, ảnh sẽ được lưu cùng lúc khi bạn tạo phòng.<?php endif; ?></small><div class="room-image-message" data-room-image-message aria-live="polite"></div></div>
