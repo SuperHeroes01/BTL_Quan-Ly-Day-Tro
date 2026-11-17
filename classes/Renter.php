@@ -17,7 +17,9 @@ class Renter extends BaseModel {
         $this->db->begin();
         try {
             $room = (new Room())->find((int) $info['id_room']);
-            $info['rent_price'] = (float) ($info['rent_price'] ?? ($room['price'] ?? 0));
+            if (!$room) { throw new RuntimeException('Không tìm thấy phòng được chọn'); }
+            $info['rent_price'] = (float) ($info['rent_price'] ?? 0);
+            if ($info['rent_price'] <= 0) { throw new RuntimeException('Vui lòng nhập giá thuê hợp đồng hợp lệ'); }
             $info['id_user'] = (new User())->insert([
                 'username' => $account['username'], 'password' => $account['password'],
                 'full_name' => $account['full_name'], 'role' => 'nguoithue', 'status' => 'Hoạt động',
@@ -44,7 +46,8 @@ class Renter extends BaseModel {
                 'recovery_identity_card' => $info['identity_card'],
             ]);
             $info['id_user'] = (int) $idUser;
-            $info['rent_price'] = (float) $room['price'];
+            $info['rent_price'] = (float) ($info['rent_price'] ?? 0);
+            if ($info['rent_price'] <= 0) { throw new RuntimeException('Vui lòng nhập giá thuê hợp đồng hợp lệ'); }
             $id = $this->insert($info);
             (new Room())->refreshStatus((int) $info['id_room']);
             $this->db->commit();
@@ -102,10 +105,42 @@ class Renter extends BaseModel {
         return true;
     }
 
+    // Cập nhật đồng thời số liên hệ và số khôi phục trong một giao dịch.
     public function updateContact($id, $phone, $hometown) {
         if (!preg_match('/^[0-9]{9,11}$/', $phone)) { return 'Số điện thoại phải gồm 9-11 chữ số'; }
-        $this->update($id, ['phone' => $phone, 'hometown' => $hometown]);
-        return true;
+        $renter = $this->find((int) $id);
+        if (!$renter) { return 'Không tìm thấy người thuê'; }
+        $this->db->begin();
+        try {
+            $this->update($id, ['phone' => $phone, 'hometown' => $hometown]);
+            $this->db->exec('UPDATE `user` SET recovery_phone = ? WHERE id_user = ?',
+                [$phone, (int) $renter['id_user']]);
+            $this->db->commit();
+            return true;
+        } catch (Throwable $e) {
+            $this->db->rollback();
+            throw $e;
+        }
+    }
+
+    // Lưu toàn bộ hồ sơ cá nhân người thuê trong cùng một giao dịch.
+    public function updateProfileAndContact($id, $fullName, $phone, $hometown) {
+        $fullName = trim((string) $fullName);
+        if ($fullName === '') { return 'Họ tên không được để trống'; }
+        if (!preg_match('/^[0-9]{9,11}$/', $phone)) { return 'Số điện thoại phải gồm 9-11 chữ số'; }
+        $renter = $this->find((int) $id);
+        if (!$renter) { return 'Không tìm thấy người thuê'; }
+        $this->db->begin();
+        try {
+            $this->update($id, ['phone' => $phone, 'hometown' => $hometown]);
+            $this->db->exec('UPDATE `user` SET full_name = ?, recovery_phone = ? WHERE id_user = ?',
+                [$fullName, $phone, (int) $renter['id_user']]);
+            $this->db->commit();
+            return true;
+        } catch (Throwable $e) {
+            $this->db->rollback();
+            throw $e;
+        }
     }
 
     // Trả phòng: đặt ngày kết thúc và cập nhật trạng thái phòng
