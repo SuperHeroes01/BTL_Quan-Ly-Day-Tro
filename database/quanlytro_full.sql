@@ -46,6 +46,15 @@ CREATE TABLE IF NOT EXISTS `user` (
 ) ENGINE=InnoDB;
 
 -- 2. Phòng trọ
+-- 1b. Danh sách tên đăng nhập đã thu hồi: không cho đăng ký lại username đã xóa.
+CREATE TABLE IF NOT EXISTS deleted_username (
+  username          VARCHAR(50) NOT NULL PRIMARY KEY,
+  original_user_id  INT NULL,
+  deleted_by        INT NULL,
+  deleted_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_deleted_username_date (deleted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS room (
   id_room     INT AUTO_INCREMENT PRIMARY KEY,
   room_number VARCHAR(20) NOT NULL UNIQUE,
