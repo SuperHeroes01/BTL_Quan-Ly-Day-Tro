@@ -39,7 +39,10 @@ $users = $userM->search(qs('q'), qs('role'));
       <td class="t-muted"><?= h($perm[$u['role']]) ?></td>
       <td><div class="actions">
         <form id="<?= $fid ?>" class="inline" method="post"><?= csrf_field() ?><input type="hidden" name="action" value="save"><input type="hidden" name="id" value="<?= (int) $u['id_user'] ?>"><button class="btn sm">Lưu</button></form>
+                <?php if (in_array($u['role'], ['admin', 'chutro'], true)): ?>
+          <span class="t-muted" title="Admin và Chủ trọ không thể đặt lại mật khẩu trực tiếp, chỉ tự đổi mật khẩu tại Tài khoản của tôi">Chỉ tự đổi MK</span>
+        <?php else: ?>
         <form class="inline" method="post" data-confirm="Đặt lại mật khẩu cho <?= h($u['username']) ?>?"><?= csrf_field() ?><input type="hidden" name="action" value="reset"><input type="hidden" name="id" value="<?= (int) $u['id_user'] ?>"><button class="btn sm amber">Đặt lại MK</button></form>
-      </div></td></tr>
+        <?php endif; ?>
   <?php endforeach; ?></tbody></table></div></div></div>
 <?php require __DIR__ . '/../includes/footer.php'; ?>
