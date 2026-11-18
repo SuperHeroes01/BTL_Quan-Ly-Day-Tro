@@ -212,24 +212,21 @@ function write_log($action, $type = 'SYSTEM') {
         }
 
         // Thông tin tài khoản
-        $userId = (int)($_SESSION['user']['id'] ?? 0);
+        $rawUserId = (int) ($_SESSION['user']['id'] ?? 0);
+        $userId = $rawUserId > 0 ? $rawUserId : null;
 
-        $username = $_SESSION['user']['username']
-            ?? ($_SESSION['user']['full_name'] ?? 'Hệ thống');
-
+        $username = (string) ($_SESSION['user']['username']
+            ?? ($_SESSION['user']['full_name'] ?? 'Hệ thống'));
+        $username = mb_substr($username, 0, 80, 'UTF-8');
+        $action = mb_substr((string) $action, 0, 500, 'UTF-8');
+        $type = mb_substr(mb_strtoupper((string) $type, 'UTF-8'), 0, 40, 'UTF-8');
         $ipAddress = $_SERVER['REMOTE_ADDR'] ?? null;
 
         $sql = "INSERT INTO activity_logs
                 (id_user, username, hanh_dong, loai_hanh_dong, ip_address, thoi_gian)
                 VALUES (?, ?, ?, ?, ?, NOW())";
 
-        $db->exec($sql, [
-            $userId,
-            $username,
-            $action,
-            mb_strtoupper($type, 'UTF-8'),
-            $ipAddress
-        ]);
+        $db->exec($sql, [$userId, $username, $action, $type, $ipAddress]);
 
     } catch (Throwable $e) {
         error_log('Lỗi ghi lịch sử hoạt động: ' . $e->getMessage());
