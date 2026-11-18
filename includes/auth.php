@@ -50,9 +50,23 @@ class Auth {
         }
 
         $sessionRole = $_SESSION['user']['role'] ?? null;
+        $staffIsActive = true;
+        if ($dbUser && ($dbUser['role'] ?? null) === 'nhanvien') {
+            try {
+                $staffLink = Database::get()->one(
+                    "SELECT id_staff FROM staff WHERE id_user = ? AND status = 'Đang làm' LIMIT 1",
+                    [(int) $dbUser['id_user']]
+                );
+                $staffIsActive = (bool) $staffLink;
+            } catch (Throwable $e) {
+                error_log('[Auth] Không thể xác minh hồ sơ nhân viên: ' . $e->getMessage());
+                $staffIsActive = false;
+            }
+        }
         if (!$dbUser
             || trim((string) ($dbUser['status'] ?? '')) !== 'Hoạt động'
-            || ($dbUser['role'] ?? null) !== $sessionRole) {
+            || ($dbUser['role'] ?? null) !== $sessionRole
+            || !$staffIsActive) {
             // Không tự cập nhật vai trò mới vào session: buộc đăng nhập lại
             // sau khi Admin thay đổi vai trò để tránh giữ quyền cũ/quyền mới.
             self::invalidateAuthentication();
@@ -120,6 +134,9 @@ class Auth {
 
     // ---- Đăng xuất thủ công ----
     public static function logout() {
+        if (self::check() && function_exists('write_log')) {
+            write_log('Đăng xuất khỏi hệ thống', 'AUTH');
+        }
         $_SESSION = [];
 
         if (ini_get('session.use_cookies')) {
