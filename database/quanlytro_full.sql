@@ -55,6 +55,21 @@ CREATE TABLE IF NOT EXISTS deleted_username (
   INDEX idx_deleted_username_date (deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 1c. Nhật ký hoạt động (Audit Trail). Không đặt khóa ngoại đến user để giữ lịch sử sau khi xóa tài khoản.
+CREATE TABLE IF NOT EXISTS activity_logs (
+  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  id_user         INT NULL,
+  username        VARCHAR(80) NOT NULL,
+  hanh_dong       VARCHAR(500) NOT NULL,
+  loai_hanh_dong  VARCHAR(40) NOT NULL DEFAULT 'SYSTEM',
+  ip_address      VARCHAR(45) NULL,
+  thoi_gian       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_activity_logs_time (thoi_gian),
+  KEY idx_activity_logs_type_time (loai_hanh_dong, thoi_gian),
+  KEY idx_activity_logs_user_time (id_user, thoi_gian),
+  KEY idx_activity_logs_username (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS room (
   id_room     INT AUTO_INCREMENT PRIMARY KEY,
   room_number VARCHAR(20) NOT NULL UNIQUE,
