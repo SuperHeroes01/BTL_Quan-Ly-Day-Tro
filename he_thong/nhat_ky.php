@@ -55,61 +55,40 @@ if ($keyword !== '') {
 $logs = [];
 $totalRows = 0;
 $types = [];
+$loadError = '';
 
 try {
-    // Database::get() trả về đối tượng Database sử dụng mysqli
     $dbConnection = Database::get();
-
-    // Đếm tổng số bản ghi
-    $sqlTotal = "
-        SELECT COUNT(*) AS total
-        FROM activity_logs
-        $where
-    ";
-
-    $totalRows = (int) $dbConnection->value(
-        $sqlTotal,
-        $params
+    $tableExists = (int) $dbConnection->value(
+        "SELECT COUNT(*) FROM information_schema.tables
+         WHERE table_schema = DATABASE() AND table_name = 'activity_logs'"
     );
 
-    // Lấy danh sách nhật ký
-    $sqlLogs = "
-        SELECT *
-        FROM activity_logs
-        $where
-        ORDER BY id DESC
-        LIMIT $limit OFFSET $offset
-    ";
+    if (!$tableExists) {
+        $loadError = 'Cơ sở dữ liệu chưa có bảng nhật ký hoạt động. Admin vui lòng Import database/migration_v68_activity_logs.sql trong phpMyAdmin.';
+    } else {
+        $sqlTotal = "SELECT COUNT(*) AS total FROM activity_logs $where";
+        $totalRows = (int) $dbConnection->value($sqlTotal, $params);
 
-    $logs = $dbConnection->query(
-        $sqlLogs,
-        $params
-    );
+        $sqlLogs = "SELECT * FROM activity_logs $where ORDER BY id DESC LIMIT $limit OFFSET $offset";
+        $logs = $dbConnection->query($sqlLogs, $params);
 
-    // Lấy danh sách loại hành động để hiển thị trong bộ lọc
-    $sqlTypes = "
-        SELECT DISTINCT loai_hanh_dong
-        FROM activity_logs
-        ORDER BY loai_hanh_dong
-    ";
-
-    $typeRows = $dbConnection->query($sqlTypes);
-
-    foreach ($typeRows as $row) {
-        $types[] = $row['loai_hanh_dong'];
+        $typeRows = $dbConnection->query(
+            "SELECT DISTINCT loai_hanh_dong FROM activity_logs ORDER BY loai_hanh_dong"
+        );
+        foreach ($typeRows as $row) {
+            $types[] = $row['loai_hanh_dong'];
+        }
     }
-
 } catch (Throwable $e) {
-    echo '<div class="alert red">Lỗi truy vấn dữ liệu: '
-        . h($e->getMessage())
-        . '</div>';
-
     error_log('Lỗi nhật ký hoạt động: ' . $e->getMessage());
+    $loadError = 'Không thể tải nhật ký hoạt động. Vui lòng kiểm tra kết nối database và cấu trúc bảng activity_logs.';
 }
 
 // Tổng số trang
 $totalPages = max(1, (int) ceil($totalRows / $limit));
 ?>
+<?php if ($loadError !== ''): ?><div class="alert error"><?= h($loadError) ?></div><?php endif; ?>
 
 <!-- KHUNG TÌM KIẾM VÀ LỌC -->
 <div class="card" style="margin-bottom: 18px;">
@@ -199,7 +178,7 @@ $totalPages = max(1, (int) ceil($totalRows / $limit));
                         <td>
                             <b><?= h($l['username']) ?></b>
                             <small class="t-muted">
-                                (ID: <?= (int) $l['id_user'] ?>)
+                                (ID: <?= !empty($l['id_user']) ? (int) $l['id_user'] : '—' ?>)
                             </small>
                         </td>
 
