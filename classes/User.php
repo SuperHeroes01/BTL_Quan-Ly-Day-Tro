@@ -51,6 +51,15 @@ class User extends BaseModel {
         if ($u['status'] !== 'Hoạt động') {
             return ['ok' => false, 'msg' => 'Tài khoản đã bị khóa, vui lòng liên hệ quản trị viên'];
         }
+        if ($u['role'] === 'nhanvien') {
+            $staff = $this->db->one(
+                "SELECT id_staff FROM staff WHERE id_user = ? AND status = 'Đang làm' LIMIT 1",
+                [(int) $u['id_user']]
+            );
+            if (!$staff) {
+                return ['ok' => false, 'msg' => 'Tài khoản kỹ thuật chưa được liên kết với hồ sơ nhân viên đang làm việc. Vui lòng liên hệ Admin.'];
+            }
+        }
         if (password_needs_rehash($u['password'], PASSWORD_DEFAULT)) {
             $this->db->exec("UPDATE `user` SET password = ? WHERE id_user = ?",
                 [password_hash($password, PASSWORD_DEFAULT), (int) $u['id_user']]);
@@ -124,6 +133,9 @@ class User extends BaseModel {
             return false;
         }
         $this->update($id, ['role' => $role, 'status' => $status]);
+        if (function_exists('write_log')) {
+            write_log('Cập nhật quyền/trạng thái tài khoản ID ' . (int) $id . ': vai trò ' . $role . ', trạng thái ' . $status, 'ACCOUNT');
+        }
         return true;
     }
 
@@ -145,6 +157,9 @@ class User extends BaseModel {
             $pw .= $alphabet[random_int(0, $max)];
         }
         $this->update($id, ['password' => $pw]);
+        if (function_exists('write_log')) {
+            write_log('Đặt lại mật khẩu tài khoản ID ' . (int) $id, 'ACCOUNT');
+        }
         return $pw;
     }
     // ---- Tài khoản người thuê mới đăng ký, chưa được gắn phòng (thông báo cho Admin) ----
@@ -233,6 +248,9 @@ class User extends BaseModel {
         if ($renter && !empty($renter['id_card_image'])) {
             $f = UPLOAD_DIR . basename($renter['id_card_image']);
             if (is_file($f)) { @unlink($f); }
+        }
+        if (function_exists('write_log')) {
+            write_log('Xóa tài khoản người thuê ' . $u['username'] . ' (ID ' . $id . ')', 'ACCOUNT');
         }
         return true;
     }
