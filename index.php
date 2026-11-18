@@ -1,307 +1,80 @@
 <?php
-// phong/index.php - Danh sách phòng cho Admin/Chủ trọ/Nhân viên và thông tin phòng của Người thuê.
-require_once __DIR__ . '/../includes/bootstrap.php';
-
-Auth::guard(['admin', 'chutro', 'nhanvien', 'nguoithue']);
-
-$roomM = new Room();
+// Trang công khai: tìm phòng trống và mở trang chi tiết từng phòng.
+require_once __DIR__ . '/includes/bootstrap.php';
+if (Auth::check() && !Auth::isManager()) { redirect('home.php'); }
 $isManager = Auth::isManager();
-$isStaff = Auth::is('nhanvien');
-$isTenant = Auth::is('nguoithue');
-
-// Chỉ Admin/Chủ trọ được phép xóa phòng. Room::deleteRoom() tự kiểm tra
-// phòng đã có hồ sơ thuê/hóa đơn để tránh xóa dữ liệu đang được tham chiếu.
-if (is_post() && $isManager) {
-    csrf_check();
-
-    if (post('action') === 'delete') {
-        $roomId = (int) post('id');
-        $result = $roomM->deleteRoom($roomId);
-
-        if ($result === true) {
-            flash('success', 'Đã xóa phòng.');
-        } else {
-            flash('error', is_string($result) ? $result : 'Không thể xóa phòng.');
-        }
-    }
-
-    redirect('phong/index.php');
-}
-
-$pageTitle = 'Quản Lý Phòng Trọ';
-$pageSub = 'Quản lý người thuê, phòng trống và phòng đã cho thuê';
-$active = 'phong';
-require __DIR__ . '/../includes/header.php';
-
-if ($isManager || $isStaff) {
-    // Người thuê không được thấy các tab quản trị. Nhân viên kỹ thuật chỉ xem danh sách phòng.
-    $tabs = $isManager
-        ? [
-            'ds' => ['Danh sách phòng', 'phong/index.php'],
-            'hd' => ['Hợp đồng thuê', 'phong/hop_dong.php'],
-            'nt' => ['Người thuê', 'phong/nguoi_thue.php'],
-        ]
-        : ['ds' => ['Danh sách phòng', 'phong/index.php']];
-    echo tabs($tabs, 'ds');
-
-    $keyword = trim((string) qs('q'));
-    $statusFilter = trim((string) qs('status'));
-
-    // Quan trọng: chỉ Admin/Chủ trọ mới truy vấn tên người thuê.
-    // Nhân viên kỹ thuật chỉ nhận dữ liệu phòng và số người ở, tránh lộ thông tin cá nhân.
-    $rooms = $roomM->searchRoom($keyword, $statusFilter, $isManager);
-    $stats = $roomM->stats();
+$kw = qs('q');
+$max = (float) qs('max', '0');
+$rooms = (new Room())->vacant($kw, $max);
+$brand = Setting::get('ten_day_tro', APP_NAME);
+$address = Setting::get('dia_chi');
+$phone = Setting::get('dien_thoai');
+$email = Setting::get('email');
 ?>
-<div class="card">
-  <div class="card-h">
-    <span>
-      Danh sách phòng
-      <?= badge((int) ($stats['rented'] ?? 0) . ' Đã thuê', 'green') ?>
-      <?= badge((int) ($stats['vacant'] ?? 0) . ' Trống', 'amber') ?>
-    </span>
-    <?php if ($isManager): ?>
-      <a class="btn" href="<?= h(url('phong/form.php')) ?>">+ Thêm phòng</a>
-    <?php endif; ?>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Danh sách phòng trống - <?= h($brand) ?></title>
+<link rel="stylesheet" href="<?= h(url('assets/css/style.css?v=6.3')) ?>">
+</head>
+<body class="public-page">
+<header class="public-nav">
+  <a class="public-brand" href="<?= h(url('index.php')) ?>"><span class="public-brand-mark">⌂</span><span><b><?= h($brand) ?></b><small>Không gian sống tiện nghi</small></span></a>
+  <nav><a href="#rooms">Danh sách phòng</a><a href="#contact">Liên hệ</a><?php if ($isManager): ?><a class="btn public-login" href="<?= h(url('home.php')) ?>">Trang quản lý</a><a href="<?= h(url('logout.php')) ?>">Đăng xuất</a><?php else: ?><a class="btn public-login" href="<?= h(url('login.php')) ?>">Đăng nhập</a><?php endif; ?></nav>
+</header>
+<section class="public-hero">
+  <div class="public-hero-overlay"></div>
+  <div class="public-hero-content">
+    <span class="public-eyebrow">TÌM KHÔNG GIAN SỐNG PHÙ HỢP</span>
+    <h1>Chọn căn phòng phù hợp<br>với cuộc sống của bạn</h1>
+    <p><?= h($address ?: 'Phòng trọ sạch sẽ, tiện nghi và an toàn') ?><?= $phone ? ' · Hotline: ' . h($phone) : '' ?></p>
+    <a class="btn public-hero-btn" href="#rooms">Khám phá phòng trống <span>↓</span></a>
   </div>
-
-  <div class="card-b">
-    <form class="filter" method="get">
-      <div class="field">
-        <label for="room-search">Tìm theo mã phòng</label>
-        <input id="room-search" name="q" value="<?= h($keyword) ?>" placeholder="Ví dụ: P101">
-      </div>
-      <div class="field">
-        <label for="room-status">Trạng thái</label>
-        <select id="room-status" name="status">
-          <option value="">Tất cả</option>
-          <?php foreach (['Trống', 'Đã thuê', 'Bảo trì'] as $statusOption): ?>
-            <option value="<?= h($statusOption) ?>" <?= $statusFilter === $statusOption ? 'selected' : '' ?>>
-              <?= h($statusOption) ?>
-            </option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-      <button class="btn" type="submit">Tìm kiếm</button>
-      <?php if ($keyword !== '' || $statusFilter !== ''): ?>
-        <a class="btn gray" href="<?= h(url('phong/index.php')) ?>">Xóa lọc</a>
-      <?php endif; ?>
-    </form>
-
-    <div class="rooms">
-      <?php foreach ($rooms as $room):
-          $roomStatus = (string) ($room['status'] ?? 'Trống');
-          $roomClasses = [
-              'Đã thuê' => 'rented',
-              'Trống' => 'vacant',
-              'Bảo trì' => 'fix',
-          ];
-          $roomClass = $roomClasses[$roomStatus] ?? 'vacant';
-          $roomId = (int) ($room['id_room'] ?? 0);
-          $roomNumber = (string) ($room['room_number'] ?? '');
-          $fallbackImage = $roomStatus === 'Đã thuê'
-              ? 'room-rented.svg'
-              : ($roomStatus === 'Bảo trì' ? 'room-maintenance.svg' : 'room-vacant.svg');
+  <div class="hero-floating-card"><b><?= count($rooms) ?></b><span>phòng đang sẵn sàng</span></div>
+</section>
+<main class="pub public-content" id="rooms">
+  <div class="public-section-heading"><div><span class="public-eyebrow dark-eyebrow">DANH SÁCH MỚI NHẤT</span><h2>Phòng trọ đang trống</h2><p>Chọn “Xem chi tiết” để xem tiện nghi, thiết bị và hình ảnh thực tế của từng phòng.</p></div><div class="public-room-count"><b><?= count($rooms) ?></b><span>phòng trống</span></div></div>
+  <form class="public-filter" method="get">
+    <label class="public-search"><span>⌕</span><input name="q" value="<?= h($kw) ?>" placeholder="Tìm theo mã phòng, ví dụ P101"></label>
+    <label class="public-price"><span>Giá tối đa</span><input type="number" name="max" min="0" step="100000" value="<?= $max > 0 ? h($max) : '' ?>" placeholder="Không giới hạn"></label>
+    <button class="btn public-search-btn">Tìm phòng</button>
+    <?php if ($kw !== '' || $max > 0): ?><a class="public-reset" href="<?= h(url('index.php')) ?>">Xóa lọc</a><?php endif; ?>
+  </form>
+  <?php if (!$rooms): ?>
+    <div class="public-empty"><div>⌂</div><h3>Chưa tìm thấy phòng phù hợp</h3><p>Vui lòng thay đổi điều kiện tìm kiếm hoặc liên hệ chủ trọ để được hỗ trợ.</p></div>
+  <?php else: ?>
+    <div class="public-room-grid">
+      <?php foreach ($rooms as $r):
+        $photoUrl = '';
+        if (!empty($r['cover_image_id'])) $photoUrl = url('phong/anh.php?id=' . (int) $r['id_room'] . '&image_id=' . (int) $r['cover_image_id']);
+        elseif (!empty($r['image_path'])) $photoUrl = url('phong/anh.php?id=' . (int) $r['id_room']);
+        else $photoUrl = url('assets/images/room-vacant.svg');
       ?>
-        <div class="room <?= h($roomClass) ?>">
-          <?php if ($isManager): ?>
-            <img
-              class="room-thumb"
-              src="<?= h(!empty($room['image_path'])
-                  ? url('phong/anh.php?id=' . $roomId)
-                  : url('assets/images/' . $fallbackImage)) ?>"
-              alt="Hình ảnh phòng <?= h($roomNumber) ?>"
-              loading="lazy">
-          <?php endif; ?>
-
-          <h3><?= h($roomNumber) ?></h3>
-
-          <?php if ($isManager): ?>
-            <p><?= h($room['tenant_names'] ?? 'Chưa có người thuê') ?></p>
-          <?php endif; ?>
-
-          <p>
-            <?= h(money($room['price'] ?? 0)) ?>/tháng
-            <?= !empty($room['area']) ? ' &middot; ' . h($room['area']) . ' m²' : '' ?>
-          </p>
-          <p><?= (int) ($room['occupants'] ?? 0) ?> người ở</p>
-
-          <?php if ($isManager): ?>
-            <div class="actions" style="margin-top:8px">
-              <a class="btn sm" href="<?= h(url('phong_chi_tiet.php?id=' . $roomId)) ?>">Xem chi tiết</a>
-              <a class="btn sm gray" href="<?= h(url('phong/form.php?id=' . $roomId)) ?>">Sửa</a>
-              <form class="inline" method="post" data-confirm="Xóa phòng <?= h($roomNumber) ?>?">
-                <?= csrf_field() ?>
-                <input type="hidden" name="action" value="delete">
-                <input type="hidden" name="id" value="<?= $roomId ?>">
-                <button class="btn sm red" type="submit">Xóa</button>
-              </form>
-            </div>
-          <?php endif; ?>
-        </div>
-      <?php endforeach; ?>
-
-      <?php if (!$rooms): ?>
-        <p class="t-muted">Không tìm thấy phòng nào phù hợp.</p>
-      <?php endif; ?>
-    </div>
-  </div>
-</div>
-<?php
-} elseif ($isTenant) {
-    // Người thuê chỉ xem phòng thuộc hồ sơ của chính mình.
-    echo tabs([
-        'ds' => ['Phòng của tôi', 'phong/index.php'],
-        'hd' => ['Hợp đồng thuê', 'phong/hop_dong.php'],
-    ], 'ds');
-
-    $info = (new Renter())->viewRoomInfo(Auth::id());
-
-    // Chặn hiển thị lại phòng cũ khi hồ sơ thuê đã kết thúc.
-    if ($info && !empty($info['end_date']) && $info['end_date'] <= date('Y-m-d')) {
-        $info = null;
-    }
-
-    if (!$info) {
-        echo '<div class="alert warn">Tài khoản hiện chưa được gắn với hợp đồng thuê còn hiệu lực.</div>';
-    } else {
-        $roomId = (int) $info['id_room'];
-
-        // Chỉ hiển thị người ở cùng phòng; không tiết lộ số điện thoại của người khác.
-        // Loại chính tài khoản hiện tại khỏi danh sách để nhãn "Người ở cùng phòng" chính xác.
-        $mates = Database::get()->query(
-            "SELECT u.full_name
-             FROM renter t
-             JOIN `user` u ON u.id_user = t.id_user
-             WHERE t.id_room = ?
-               AND " . Renter::ACTIVE . "
-               AND t.id_user <> ?
-             ORDER BY u.full_name",
-            [$roomId, Auth::id()]
-        );
-
-        $tenantPhotos = (new Room())->images($roomId);
-        $tenantGallery = [];
-
-        foreach ($tenantPhotos as $photo) {
-            $tenantGallery[] = [
-                'url' => url('phong/anh.php?id=' . $roomId . '&image_id=' . (int) $photo['id_image']),
-                'alt' => 'Ảnh phòng ' . $info['room_number'] . ' - ' . ($photo['original_name'] ?: 'Ảnh thực tế'),
-            ];
-        }
-
-        if (!$tenantGallery && !empty($info['image_path'])) {
-            $tenantGallery[] = [
-                'url' => url('phong/anh.php?id=' . $roomId),
-                'alt' => 'Ảnh phòng ' . $info['room_number'],
-            ];
-        }
-
-        $hasContractRent = isset($info['rent_price']) && (float) $info['rent_price'] > 0;
-        $displayRent = $hasContractRent ? $info['rent_price'] : ($info['price'] ?? 0);
-        $rentLabel = $hasContractRent ? 'Giá thuê theo hồ sơ' : 'Giá niêm yết hiện tại';
-?>
-<div class="grid g2">
-  <div class="card">
-    <div class="card-h">
-      <span>
-        Ảnh thực tế phòng <?= h($info['room_number']) ?>
-        <small class="tenant-gallery-live-label">Tự động trình chiếu</small>
-      </span>
-      <span class="badge blue">Chỉ phòng của bạn</span>
-    </div>
-    <div class="card-b">
-      <div class="tenant-room-gallery" data-room-gallery data-autoplay="4000">
-        <div class="gallery-main tenant-gallery-main">
-          <img
-            class="gallery-current"
-            src="<?= h($tenantGallery[0]['url'] ?? url('assets/images/room-rented.svg')) ?>"
-            alt="<?= h($tenantGallery[0]['alt'] ?? ('Ảnh minh họa phòng ' . $info['room_number'])) ?>"
-            data-gallery-main>
-          <?php if (count($tenantGallery) > 1): ?>
-            <button class="gallery-arrow prev" type="button" data-gallery-prev aria-label="Ảnh trước">‹</button>
-            <button class="gallery-arrow next" type="button" data-gallery-next aria-label="Ảnh tiếp theo">›</button>
-          <?php endif; ?>
-          <span class="gallery-count" data-gallery-count>
-            <?= $tenantGallery ? '1 / ' . count($tenantGallery) : 'Ảnh minh họa' ?>
-          </span>
-        </div>
-
-        <?php if (count($tenantGallery) > 1): ?>
-          <div class="gallery-thumbs" data-gallery-thumbs>
-            <?php foreach ($tenantGallery as $index => $photo): ?>
-              <button
-                type="button"
-                class="gallery-thumb<?= $index === 0 ? ' active' : '' ?>"
-                data-gallery-index="<?= $index ?>"
-                aria-label="Xem ảnh <?= $index + 1 ?>">
-                <img src="<?= h($photo['url']) ?>" alt="<?= h($photo['alt']) ?>">
-              </button>
-            <?php endforeach; ?>
+      <article class="public-room-card">
+        <a class="public-room-photo" href="<?= h(url('phong_chi_tiet.php?id=' . (int) $r['id_room'])) ?>">
+          <img src="<?= h($photoUrl) ?>" alt="Hình ảnh phòng <?= h($r['room_number']) ?>" loading="lazy">
+          <?php if (!empty($r['photo_count'])): ?><span class="public-photo-count">▧ <?= (int) $r['photo_count'] ?> ảnh</span><?php endif; ?>
+        </a>
+        <div class="public-room-info">
+          <div class="public-room-title"><h3>Phòng <?= h($r['room_number']) ?></h3><span><?= $r['area'] ? h($r['area']) . ' m²' : 'Diện tích linh hoạt' ?></span></div>
+          <div class="public-room-price"><?= h(money($r['price'])) ?><small>/tháng</small></div>
+          <p class="public-room-desc"><?= h(mb_strimwidth((string) ($r['description'] ?? ''), 0, 100, '…', 'UTF-8') ?: 'Phòng đang sẵn sàng đón người thuê mới.') ?></p>
+          <div class="public-room-actions">
+            <a class="btn public-detail-btn" href="<?= h(url('phong_chi_tiet.php?id=' . (int) $r['id_room'])) ?>">Xem chi tiết <span>→</span></a>
+            <a class="public-contact-link" href="#contact">Liên hệ</a>
+            <?php if ($isManager): ?><a class="btn gray public-manage-room-btn" href="<?= h(url('phong/form.php?id=' . (int) $r['id_room'])) ?>">Chỉnh sửa thông tin & ảnh</a><?php endif; ?>
           </div>
-        <?php endif; ?>
-      </div>
-
-      <p class="gallery-auto-note">
-        Ảnh tự động chuyển sau 4 giây. Dùng nút mũi tên hoặc ảnh thu nhỏ để xem ảnh khác.
-      </p>
-
-      <div class="rowline">
-        <span><?= h($rentLabel) ?></span>
-        <b><?= (float) $displayRent > 0 ? h(money($displayRent)) . '/tháng' : 'Chưa xác nhận giá thuê' ?></b>
-      </div>
-      <div class="rowline">
-        <span>Diện tích</span>
-        <b><?= !empty($info['area']) ? h($info['area']) . ' m²' : '—' ?></b>
-      </div>
-      <div class="rowline">
-        <span>Ngày vào ở</span>
-        <b><?= h(dmy($info['start_date'])) ?></b>
-      </div>
-      <div class="rowline">
-        <span>Mô tả</span>
-        <b><?= h($info['description'] ?? '') ?></b>
-      </div>
-
-      <p style="margin-top:12px">
-        <a class="btn sm" href="<?= h(url('phong/hop_dong.php')) ?>">Xem hợp đồng thuê</a>
-      </p>
-
-      <p><b>Người ở cùng phòng</b></p>
-      <?php if ($mates): ?>
-        <?php foreach ($mates as $mate): ?>
-          <div class="rowline"><span><?= h($mate['full_name']) ?></span></div>
-        <?php endforeach; ?>
-      <?php else: ?>
-        <div class="rowline"><span class="t-muted">Hiện không có người ở cùng.</span></div>
-      <?php endif; ?>
+        </div>
+      </article>
+      <?php endforeach; ?>
     </div>
-  </div>
-
-  <div class="card">
-    <div class="card-h">Thiết bị trong phòng</div>
-    <div class="tw">
-      <table class="t">
-        <thead>
-          <tr><th>Thiết bị</th><th>SL</th><th>Trạng thái</th></tr>
-        </thead>
-        <tbody>
-          <?php foreach (($info['devices'] ?? []) as $device): ?>
-            <tr>
-              <td><?= h($device['device_name']) ?></td>
-              <td><?= (int) $device['quantity'] ?></td>
-              <td><?= status_badge($device['status']) ?></td>
-            </tr>
-          <?php endforeach; ?>
-          <?php if (empty($info['devices'])): ?>
-            <tr><td colspan="3" class="t-muted">Chưa có thiết bị.</td></tr>
-          <?php endif; ?>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
-<?php
-    }
-}
-
-require __DIR__ . '/../includes/footer.php';
+  <?php endif; ?>
+</main>
+<footer class="public-footer" id="contact">
+  <div><b><?= h($brand) ?></b><p><?= h($address ?: 'Cảm ơn bạn đã quan tâm đến phòng trọ của chúng tôi.') ?></p></div>
+  <div class="public-contact-detail"><?php if ($phone): ?><span>☎ <?= h($phone) ?></span><?php endif; ?><?php if ($email): ?><span>✉ <?= h($email) ?></span><?php endif; ?><?php if ($isManager): ?><a href="<?= h(url('home.php')) ?>">Quay lại trang quản lý →</a><?php else: ?><a href="<?= h(url('login.php')) ?>">Đăng nhập hệ thống →</a><?php endif; ?></div>
+  <small>© <?= date('Y') ?> <?= h(APP_NAME) ?> · An toàn · Tiện nghi · Minh bạch</small>
+</footer>
+</body>
+</html>
