@@ -1,0 +1,60 @@
+/* Khoảng cách nhanh */
+.mb-0 { margin-bottom: 0 !important; }
+.mb-2 { margin-bottom: var(--space-2) !important; }
+.mb-3 { margin-bottom: var(--space-3) !important; }
+.mb-4 { margin-bottom: var(--space-4) !important; }
+.card-spaced { margin-bottom: 18px !important; }
+.mt-3 { margin-top: var(--space-3) !important; }
+.mt-4 { margin-top: var(--space-4) !important; }
+
+/* Nút bấm nhỏ gọn & Viền */
+.btn-xs {
+    padding: 4px 8px !important;
+    font-size: 0.85rem !important;
+}
+.border-subtle {
+    border: 1px solid var(--color-border) !important;
+}
+
+/* Căn chỉnh văn bản & Hiển thị */
+.text-center { text-align: center !important; }
+.text-right { text-align: right !important; }
+.text-muted { color: var(--color-muted) !important; }
+.text-danger { color: var(--color-danger) !important; }
+.text-success { color: var(--color-success) !important; }
+.d-flex-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+/* Khôi phục hiệu ứng nền chuyển động qua lại trang đăng nhập */
+@keyframes loginBackgroundPanV6 {
+    0% {
+        transform: scale(1.08) translate3d(-2%, 0, 0);
+    }
+    100% {
+        transform: scale(1.14) translate3d(2%, -1%, 0);
+    }
+}
+
+body.auth-page .auth-layout .auth-visual {
+    position: relative;
+    overflow: hidden;
+}
+
+body.auth-page .auth-layout .auth-visual::before {
+    content: "";
+    position: absolute;
+    inset: -5%;
+    background-image: url('../images/room-background-generated.webp');
+    background-size: cover;
+    background-position: center;
+    z-index: 0;
+    will-change: transform;
+    animation: loginBackgroundPanV6 14s ease-in-out infinite alternate !important;
+    animation-duration: 14s !important;
+    animation-iteration-count: infinite !important;
+}
+
