@@ -7,6 +7,14 @@ $billM = new Bill(); $svcM = new Service(); $roomM = new Room();
 $idRoom = (int) (is_post() ? post('id_room') : qs('room', '0'));
 $month = is_post() ? post('month') : qs('month', date('Y-m'));
 if (!valid_month($month)) { $month = date('Y-m'); }
+$defaultStart = $month . '-01';
+$defaultEnd = date('Y-m-t', strtotime($defaultStart));
+$dateCreated = is_post() ? post('date_created', date('Y-m-d')) : qs('date_created', date('Y-m-d'));
+$periodStart = is_post() ? post('period_start', $defaultStart) : qs('period_start', $defaultStart);
+$periodEnd = is_post() ? post('period_end', $defaultEnd) : qs('period_end', $defaultEnd);
+if (!valid_date($dateCreated)) { $dateCreated = date('Y-m-d'); }
+if (!valid_date($periodStart)) { $periodStart = $defaultStart; }
+if (!valid_date($periodEnd)) { $periodEnd = $defaultEnd; }
 
 if (is_post()) {
     csrf_check();
@@ -15,7 +23,7 @@ if (is_post()) {
     foreach ((array) ($_POST['new'] ?? []) as $sid => $v) { $inputs['idx'][(int) $sid]['new'] = trim((string) $v); }
     foreach ((array) ($_POST['use'] ?? []) as $sid => $v) { $inputs['use'][(int) $sid] = 1; }
     try {
-        $id = $billM->generateBill($idRoom, $month, $inputs, post('note'));
+        $id = $billM->generateBill($idRoom, $month, $inputs, post('note'), post('date_created'), post('period_start'), post('period_end'));
         flash('success', 'Đã lập hóa đơn tháng ' . month_label($month));
         redirect('dich_vu/hoa_don_xem.php?id=' . $id);
     } catch (RuntimeException $e) { flash('error', $e->getMessage()); }
@@ -35,24 +43,31 @@ if ($room && $room['status'] === 'Đã thuê') {
 }
 $services = $svcM->active();
 $pageTitle = 'Lập hóa đơn';
-$pageSub = 'Nhập chỉ số điện nước và chọn dịch vụ sử dụng trong tháng';
+$pageSub = 'Chọn ngày lập hóa đơn, kỳ tính tiền và nhập chỉ số điện nước, dịch vụ';
 $active = 'dich_vu';
 require __DIR__ . '/../includes/header.php';
 ?>
-<div class="card"><div class="card-h">Chọn phòng và tháng</div><div class="card-b">
-  <form class="filter" method="get">
+<div class="card"><div class="card-h">Chọn phòng và thời gian lập hóa đơn</div><div class="card-b">
+  <form class="filter bill-date-filter" method="get" id="billPeriodFilter">
     <div class="field"><label>Phòng đang thuê</label><select name="room" required><option value="">-- Chọn phòng --</option>
       <?php foreach ($rented as $r): ?><option value="<?= (int) $r['id_room'] ?>" <?= $idRoom == $r['id_room'] ? 'selected' : '' ?>><?= h($r['room_number']) ?></option><?php endforeach; ?></select></div>
-    <div class="field"><label>Tháng</label><input type="month" name="month" value="<?= h($month) ?>" required></div>
+    <div class="field"><label>Tháng hóa đơn</label><input type="month" id="billMonth" name="month" value="<?= h($month) ?>" required></div>
+    <div class="field"><label>Ngày lập hóa đơn</label><input type="date" name="date_created" value="<?= h($dateCreated) ?>" required></div>
+    <div class="field"><label>Ngày bắt đầu tính tiền</label><input type="date" id="periodStart" name="period_start" value="<?= h($periodStart) ?>" required></div>
+    <div class="field"><label>Ngày kết thúc tính tiền</label><input type="date" id="periodEnd" name="period_end" value="<?= h($periodEnd) ?>" required></div>
     <button class="btn">Tiếp tục</button>
-  </form></div></div>
+  </form>
+  <p class="t-muted" style="margin:10px 0 0;font-size:12px">Khoảng thời gian tính tiền phải nằm trong tháng hóa đơn đã chọn. Tiền phòng được tính theo số ngày thực tế trong khoảng đã chọn.</p>
+</div></div>
 
 <?php if ($room && $room['status'] === 'Đã thuê' && $rentPrice !== null): ?>
 <form class="card" method="post" id="billForm" data-room-price="<?= h($rentPrice) ?>">
   <div class="card-h">Hóa đơn phòng <?= h($room['room_number']) ?> &middot; tháng <?= h(month_label($month)) ?></div>
   <div class="card-b">
-    <?= csrf_field() ?><input type="hidden" name="id_room" value="<?= (int) $idRoom ?>"><input type="hidden" name="month" value="<?= h($month) ?>">
-    <div class="rowline"><span>Tiền phòng theo hợp đồng</span><b><?= h(money($rentPrice)) ?></b></div>
+    <?= csrf_field() ?><input type="hidden" name="id_room" value="<?= (int) $idRoom ?>"><input type="hidden" name="month" value="<?= h($month) ?>"><input type="hidden" name="date_created" value="<?= h($dateCreated) ?>"><input type="hidden" name="period_start" value="<?= h($periodStart) ?>"><input type="hidden" name="period_end" value="<?= h($periodEnd) ?>">
+    <div class="rowline"><span>Ngày lập hóa đơn</span><b><?= h(dmy($dateCreated)) ?></b></div>
+    <div class="rowline"><span>Kỳ tính tiền</span><b><?= h(dmy($periodStart)) ?> – <?= h(dmy($periodEnd)) ?></b></div>
+    <div class="rowline"><span>Tiền phòng theo kỳ đã chọn</span><b><?= h(money(round($rentPrice * (((new DateTime($periodStart))->diff(new DateTime($periodEnd))->days) + 1) / (int) date('t', strtotime($month . '-01'))))) ?></b></div>
     <h3 style="margin:14px 0 6px">Dịch vụ tính theo chỉ số</h3>
     <p class="meter-carry-note">Chỉ số cũ được tự động lấy từ chỉ số mới gần nhất đã lưu của phòng ở các hóa đơn trước. Ví dụ: tháng 10 ghi chỉ số mới 450 thì tháng 11 sẽ tự điền chỉ số cũ là 450. Chỉ lần ghi đầu tiên mới cần nhập chỉ số cũ ban đầu.</p>
     <div class="tw"><table class="t"><thead><tr><th>Dịch vụ</th><th>Đơn giá</th><th>Chỉ số cũ</th><th>Chỉ số mới</th><th>Thành tiền</th></tr></thead><tbody>
@@ -74,4 +89,44 @@ require __DIR__ . '/../includes/header.php';
 </form>
 <?php elseif ($rentPriceError !== ''): ?><div class="alert warn"><?= h($rentPriceError) ?></div>
 <?php elseif ($idRoom): ?><div class="alert warn">Phòng chưa có người thuê nên không thể lập hóa đơn.</div><?php endif; ?>
+<script>
+(function () {
+  const monthInput = document.getElementById('billMonth');
+  const startInput = document.getElementById('periodStart');
+  const endInput = document.getElementById('periodEnd');
+  if (!monthInput || !startInput || !endInput) return;
+  monthInput.addEventListener('change', function () {
+    if (!this.value) return;
+    const parts = this.value.split('-');
+    const year = Number(parts[0]);
+    const month = Number(parts[1]);
+    const lastDay = new Date(year, month, 0).getDate();
+    startInput.value = this.value + '-01';
+    endInput.value = this.value + '-' + String(lastDay).padStart(2, '0');
+    startInput.min = this.value + '-01';
+    startInput.max = this.value + '-' + String(lastDay).padStart(2, '0');
+    endInput.min = this.value + '-01';
+    endInput.max = this.value + '-' + String(lastDay).padStart(2, '0');
+  });
+  const syncBounds = function () {
+    if (!monthInput.value) return;
+    const [year, month] = monthInput.value.split('-').map(Number);
+    const first = monthInput.value + '-01';
+    const last = monthInput.value + '-' + String(new Date(year, month, 0).getDate()).padStart(2, '0');
+    [startInput, endInput].forEach(function (el) { el.min = first; el.max = last; });
+  };
+  syncBounds();
+  document.getElementById('billPeriodFilter')?.addEventListener('submit', function (event) {
+    if (startInput.value && endInput.value && startInput.value > endInput.value) {
+      event.preventDefault();
+      alert('Ngày kết thúc phải bằng hoặc sau ngày bắt đầu.');
+    }
+  });
+})();
+</script>
+<?php
+$billingJsVer = file_exists(__DIR__ . '/../assets/js/modules/billing.js') 
+    ? filemtime(__DIR__ . '/../assets/js/modules/billing.js') : '1.0';
+?>
+<script src="<?= h(url('assets/js/modules/billing.js?v=' . $billingJsVer)) ?>"></script>
 <?php require __DIR__ . '/../includes/footer.php'; ?>
