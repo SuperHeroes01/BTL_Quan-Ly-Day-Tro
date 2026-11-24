@@ -1,0 +1,47 @@
+:root {
+    /* ... các biến chuẩn của Gói 1 ... */
+
+    /* Ánh xạ tương thích ngược cho code cũ trong style.css */
+    --blue: var(--color-primary);
+    --navy: var(--color-primary-dark);
+    --bg: var(--color-background);
+    --text: var(--color-text);
+}
+
+:root {
+    /* Màu thương hiệu */
+    --color-primary: #1769e8;
+    --color-primary-hover: #1256c4;
+    --color-primary-dark: #102b50;
+    --color-secondary: #13a89a;
+
+    /* Màu trạng thái */
+    --color-success: #079b78;
+    --color-success-bg: #e6f7f2;
+    --color-warning: #d97706;
+    --color-warning-bg: #fef3c7;
+    --color-danger: #dc4c4c;
+    --color-danger-bg: #fee2e2;
+
+    /* Màu giao diện & Văn bản */
+    --color-background: #edf4fb;
+    --color-surface: #ffffff;
+    --color-text: #153454;
+    --color-muted: #71849c;
+    --color-border: #dce8f4;
+
+    /* Khoảng cách chuẩn */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+
+    /* Bo góc & Đổ bóng */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 18px;
+    --shadow-sm: 0 2px 8px rgba(16, 43, 80, 0.06);
+    --shadow-md: 0 8px 24px rgba(16, 43, 80, 0.1);
+}
