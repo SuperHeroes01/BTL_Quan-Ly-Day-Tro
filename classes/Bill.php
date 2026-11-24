@@ -3,7 +3,7 @@
 class Bill extends BaseModel {
     protected $table = 'bill';
     protected $pk = 'id_bill';
-    protected $fields = ['id_room', 'month', 'date_created', 'due_date', 'total_amount', 'payment_status',
+    protected $fields = ['id_room', 'month', 'date_created', 'period_start', 'period_end', 'due_date', 'total_amount', 'payment_status',
                          'paid_date', 'reminded_at', 'note'];
 
     public function insert(array $d) { return $this->insertRow($d); }
@@ -56,8 +56,15 @@ class Bill extends BaseModel {
 
     // Lập hóa đơn tháng cho một phòng.
     // $inputs = ['idx' => [id_service => ['old'=>.., 'new'=>..]], 'use' => [id_service => '1']]
-    public function generateBill($idRoom, $month, array $inputs, $note = '') {
+    public function generateBill($idRoom, $month, array $inputs, $note = '', $dateCreated = null, $periodStart = null, $periodEnd = null) {
         if (!valid_month($month)) { throw new RuntimeException('Tháng lập hóa đơn không hợp lệ'); }
+        $dateCreated = $dateCreated ?: date('Y-m-d');
+        $periodStart = $periodStart ?: ($month . '-01');
+        $periodEnd = $periodEnd ?: date('Y-m-t', strtotime($month . '-01'));
+        if (!valid_date($dateCreated)) { throw new RuntimeException('Ngày lập hóa đơn không hợp lệ'); }
+        if (!valid_date($periodStart) || !valid_date($periodEnd)) { throw new RuntimeException('Ngày bắt đầu hoặc ngày kết thúc tính tiền không hợp lệ'); }
+        if ($periodStart > $periodEnd) { throw new RuntimeException('Ngày kết thúc phải bằng hoặc sau ngày bắt đầu'); }
+        if (substr($periodStart, 0, 7) !== $month || substr($periodEnd, 0, 7) !== $month) { throw new RuntimeException('Khoảng thời gian tính tiền phải nằm trong tháng hóa đơn đã chọn'); }
         $room = (new Room())->find($idRoom);
         if (!$room) { throw new RuntimeException('Không tìm thấy phòng'); }
         if ($room['status'] !== 'Đã thuê') { throw new RuntimeException('Phòng chưa có người thuê, không thể lập hóa đơn'); }
@@ -65,7 +72,10 @@ class Bill extends BaseModel {
             throw new RuntimeException('Phòng ' . $room['room_number'] . ' đã có hóa đơn tháng ' . month_label($month));
         }
 
-        $rentPrice = $this->contractRentPrice($idRoom, $month);
+        $monthlyRent = $this->contractRentPrice($idRoom, $month);
+        $periodDays = (int) ((new DateTime($periodStart))->diff(new DateTime($periodEnd))->days) + 1;
+        $daysInMonth = (int) date('t', strtotime($month . '-01'));
+        $rentPrice = round($monthlyRent * $periodDays / $daysInMonth);
         $items = [[
             'id_service' => null, 'item_name' => 'Tiền phòng', 'old_index' => null, 'new_index' => null,
             'quantity' => 1, 'unit_price' => $rentPrice,
@@ -112,8 +122,9 @@ class Bill extends BaseModel {
         $this->db->begin();
         try {
             $idBill = $this->insert([
-                'id_room' => (int) $idRoom, 'month' => $month, 'date_created' => date('Y-m-d'),
-                'due_date' => date('Y-m-d', strtotime("+$days days")),
+                'id_room' => (int) $idRoom, 'month' => $month, 'date_created' => $dateCreated,
+                'period_start' => $periodStart, 'period_end' => $periodEnd,
+                'due_date' => date('Y-m-d', strtotime($dateCreated . " +$days days")),
                 'total_amount' => $this->calculateTotal($items), 'payment_status' => 'Chưa thu', 'note' => $note,
             ]);
             $ib = new ItemizedBill();
